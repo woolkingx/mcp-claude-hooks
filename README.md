@@ -1,18 +1,31 @@
 # mcp-claude-hooks
 
-A programmable safety layer for Claude Code. Define rules in JSON, and every tool call, permission request, and session event passes through your rules before Claude acts.
+A programmable safety layer for [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks). Define rules in JSON — no code to write.
 
-## What It Does
+## Why
 
-Claude Code fires [hook events](https://docs.anthropic.com/en/docs/claude-code/hooks) at key moments — before running a command, after editing a file, when a session starts. **mcp-claude-hooks** intercepts these events and applies your rules:
+Claude Code in autonomous mode is powerful, but one wrong `rm -rf` or `git push --force` can ruin your day. The built-in hook system lets you run a command on each event, but writing and maintaining individual shell scripts for every safety check doesn't scale.
 
-- **Block dangerous commands** — `rm -rf`, `sudo`, force-push to main, `git reset --hard`
-- **Require confirmation** — `git commit`, `chmod`, config file edits
-- **Inject context** — remind Claude of project conventions on session start, after compaction, or when subagents launch
-- **Auto-approve safe operations** — reading docs, writing to `.claude/` directory
-- **Audit everything** — every event logged with timestamp, rule match, and action taken
+**mcp-claude-hooks** gives you a rule engine that sits between Claude and your system. You describe _what to block, allow, or modify_ in JSON, and the engine handles matching, deduplication, and response merging for you.
 
-All rules are JSON files. No code to write. Drop a file in `rules/`, and it takes effect immediately.
+## Features
+
+| Feature | What it does for you |
+|---------|---------------------|
+| **Safety guardrails** | Block destructive commands (`rm -rf`, `sudo`, force-push, `git reset --hard`) before they execute. Run autonomous mode without babysitting. |
+| **Smart auto-approve** | Auto-approve operations you trust (reading docs, writing to safe dirs) so you stop clicking "Allow" dozens of times per session. |
+| **Context injection** | Re-inject project conventions after compaction, on session start, when subagents launch. Claude stays on track without you repeating yourself. |
+| **Bash AST matching** | Match against parsed command AST, not string patterns. `rm -rf /` inside `mkdir foo && rm -rf /` is caught; `echo "remove"` is not. |
+| **Live rule management** | Create, toggle, test, and delete rules via MCP tools or CLI — no restart, no config edit, no leaving your session. |
+| **Observability** | System status, per-rule analytics (match count, deny rate, latency), and full event logs — see what Claude tried and why it was blocked. |
+| **Pause / resume** | One command to disable all rules (pass-through mode) for debugging, one to re-enable. |
+| **Hot reload** | Edit rule JSON files on disk, reload without restarting. Daemon mode keeps state across reloads. |
+| **Daemon mode** | Background process with Unix socket — lower latency, shared dedup state, survives across hook invocations. |
+| **Test mode** | Set any rule to `"test"` — it matches and logs but takes no action. Validate before you enforce. |
+| **Deduplication** | Context rules fire once per session by default. No repeated token waste from the same reminder. |
+| **27 hook events** | Covers the full Claude Code lifecycle — tool use, permissions, sessions, subagents, compaction, worktrees, tasks, elicitation. |
+| **55 included rules** | Ships with a battle-tested rule set. Edit, disable, or delete any of them. Add your own. |
+| **Zero dependencies** | Node.js only. Bash parser is built-in. Nothing to install beyond `npm install`. |
 
 ## Quick Start
 
@@ -128,49 +141,39 @@ Ships with 55 rules covering common safety patterns:
 
 All rules are in `rules/`. Edit, disable, or delete any of them. Add your own.
 
-## Daemon Mode
+## Management & Operations
 
-For faster response times, run as a background daemon. Hook events connect via Unix socket instead of cold-starting Node on every call:
-
-```bash
-# Start daemon
-node src/main.mjs start --daemon
-
-# Check status
-node src/main.mjs status
-
-# Reload rules without restart
-node src/main.mjs reload
-
-# Stop
-node src/main.mjs stop
-```
-
-When the daemon is running, the hook command auto-detects the socket and proxies through it. No config change needed.
-
-## MCP Server
-
-Also works as an [MCP server](https://modelcontextprotocol.io/) for managing rules programmatically:
+**CLI** — manage from your terminal:
 
 ```bash
-# List rules
+# Rules
 node src/main.mjs cli hooks_rules list
-
-# Create a rule
+node src/main.mjs cli hooks_rules toggle name=deny-rm enabled=false
+node src/main.mjs cli hooks_rules test name=deny-rm
 node src/main.mjs cli hooks_rules create name=my-rule event=PreToolUse action=deny ...
 
-# Toggle a rule
-node src/main.mjs cli hooks_rules toggle name=deny-rm enabled=false
-
-# Test a rule against a mock event
-node src/main.mjs cli hooks_rules test name=deny-rm
-
-# System status
+# Status & logs
 node src/main.mjs cli hooks_admin status
-
-# View logs
 node src/main.mjs cli hooks_admin logs
+node src/main.mjs cli hooks_admin analytics
+
+# Operational
+node src/main.mjs cli hooks_admin pause
+node src/main.mjs cli hooks_admin resume
+node src/main.mjs cli hooks_admin reload
 ```
+
+**MCP server** — add to `~/.claude.json` and Claude can manage rules, check status, and help author new rules interactively.
+
+**Daemon** — background process for lower latency and shared state:
+
+```bash
+node src/main.mjs start --daemon   # start
+node src/main.mjs status           # check
+node src/main.mjs stop             # stop
+```
+
+Auto-detected by the hook command. No config change needed.
 
 ## Supported Events
 

@@ -1,6 +1,6 @@
 {
   "name": "mcp-claude-hooks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Schema-driven hook processor + MCP server for Claude Code. Draft-07 rule matching, 27 hook events, three-layer architecture.",
   "main": "src/main.mjs",

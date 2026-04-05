@@ -93,7 +93,7 @@ export function createEngine({ rules, features, state, config = {}, projectRoot,
         const resolved = loader.resolve(eventSchemaRef)
         const raw = resolved.node || resolved
         const responseSchema = raw.definitions?.response || null
-        schema = { raw, loader, responseSchema }
+        schema = { raw, loader: resolved.loader || loader, responseSchema }
       } catch (e) {
         log('debug', `schema resolve error: ${eventName} ${e.message}`)
       }

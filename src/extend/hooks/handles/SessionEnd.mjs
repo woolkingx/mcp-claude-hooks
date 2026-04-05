@@ -14,10 +14,6 @@ export function handle(payload) {
 
   response.continue = true
 
-  // Build HSO then one-shot set
-  const hso = { hookEventName: 'SessionEnd' }
-  response.hookSpecificOutput = hso
-
   log('debug', `session end session=${event.session_id || 'none'}`)
 
   return response
