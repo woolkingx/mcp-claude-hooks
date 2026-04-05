@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features.schema.json",
+  "title": "Features",
+  "description": "Feature registry — root node for all feature configs. Each property is a named feature with its own config schema.",
+
+  "type": "object",
+  "properties": {
+    "lint":             { "$ref": "../../extend/hooks/features/lint/lint.schema.json" },
+    "doc-size-checker": { "$ref": "../../extend/hooks/features/doc-size-checker/doc-size-checker.schema.json" },
+    "agent":            { "$ref": "../../extend/hooks/features/agent/agent.schema.json" }
+  },
+  "additionalProperties": false,
+
+  "x-docs": {
+    "intent": "Single $ref root for all feature config schemas. Loaded at boot via config.json. rule.feature.name resolves to config.features[name] for config schema validation.",
+    "category": "config",
+    "notes": "To add a feature: create features/xxx/xxx.schema.json, add $ref here. No code changes needed for schema registration."
+  }
+}

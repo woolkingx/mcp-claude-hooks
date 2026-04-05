@@ -1,0 +1,9 @@
+{
+  "name": "elicitation-validate-input",
+  "description": "Validate elicitation input",
+  "enabled": true,
+  "event": "Elicitation",
+  "priority": 50,
+  "action": "context",
+  "reason": "MCP elicitation request — validate input before presenting to user"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "redirect-websearch",
+  "description": "Deny WebSearch",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 10,
+  "tool": "WebSearch",
+  "action": "deny",
+  "reason": "WebSearch disabled.\nUse: mcp__mcp-playwright-aio__custom (action: search_web)"
+}

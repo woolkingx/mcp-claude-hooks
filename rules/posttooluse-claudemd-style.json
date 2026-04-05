@@ -1,0 +1,25 @@
+{
+  "name": "posttooluse-claudemd-style",
+  "description": "Remind CLAUDE.md writing style: concise rules, no token waste",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 60,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "context",
+  "reason": "**[CLAUDE.md Style]** You just edited a CLAUDE.md file. Check:\n1. Rules only — no explanatory prose, no \"you are an AI\", no safety reminders\n2. Each rule: concrete ✅/❌ examples (model reads patterns, not abstractions)\n3. Don't repeat system prompt rules (tool preference, emoji, security — already enforced)\n4. Keep under 300 words — every word costs tokens on EVERY request\n5. Project conventions only: language, framework, test runner, commit format\n6. Move enforcement to hook rules where possible (PreToolUse deny > CLAUDE.md suggestion)",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "(CLAUDE|AGENTS|GEMINI)\\.md$",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

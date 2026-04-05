@@ -1,0 +1,30 @@
+{
+  "name": "allow-claude-dir-write",
+  "description": "Auto-allow writing to .claude/ directory (skills, commands, agents). Workaround for bypass-immune safetyCheck.",
+  "enabled": true,
+  "event": "PermissionRequest",
+  "priority": 10,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "allow",
+  "reason": "[allow] .claude/ dir write — safetyCheck bypass workaround",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "/\\.claude/",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "required": [
+      "tool_input"
+    ]
+  },
+  "repeat": true
+}

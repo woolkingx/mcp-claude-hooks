@@ -1,0 +1,39 @@
+{
+  "name": "deny-git-clean",
+  "description": "Block git clean",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 80,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "git clean removes untracked files permanently.\nReview files manually before cleaning.",
+  "match_bash": {
+    "allOf": [
+      {
+        "properties": {
+          "name": { "properties": { "text": { "const": "git" } } }
+        },
+        "required": ["name"]
+      },
+      {
+        "properties": {
+          "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "clean" } } } }
+        }
+      },
+      {
+        "anyOf": [
+          {
+            "properties": {
+              "suffix": { "type": "array", "contains": { "properties": { "text": { "pattern": "^-[a-zA-Z]*f" } } } }
+            }
+          },
+          {
+            "properties": {
+              "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "--force" } } } }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

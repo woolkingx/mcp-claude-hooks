@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClaudeHooksTools",
+  "description": "MCP tools for Claude Code hook management.",
+
+  "definitions": {
+    "NameInput": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Rule name" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "NameContentInput": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Rule name (used as filename)" },
+        "content": { "description": "Rule content as JSON string or object", "oneOf": [{ "type": "string" }, { "type": "object" }] }
+      },
+      "required": ["name", "content"],
+      "additionalProperties": false
+    },
+    "EmptyInput": {
+      "type": "object",
+      "additionalProperties": false
+    },
+
+    "RuleListInput": {
+      "type": "object",
+      "properties": {
+        "enabled_only": { "type": "boolean", "default": false, "description": "Filter enabled rules only" },
+        "event_type": { "type": "string", "description": "Filter by hook event type (e.g. PreToolUse, PostToolUse)" }
+      },
+      "additionalProperties": false
+    },
+    "RuleToggleInput": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Rule name" },
+        "enabled": { "type": "boolean", "description": "Enable or disable" }
+      },
+      "required": ["name", "enabled"],
+      "additionalProperties": false
+    },
+    "RuleValidateInput": {
+      "type": "object",
+      "properties": {
+        "content": { "description": "Rule content to validate as JSON string or object", "oneOf": [{ "type": "string" }, { "type": "object" }] }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "RuleTestInput": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Rule name to test against (omit to run all rules — real execution)" },
+        "event": { "type": "object", "description": "Event data to test", "additionalProperties": true }
+      },
+      "required": ["event"],
+      "additionalProperties": false
+    },
+    "RuleTemplateInput": {
+      "type": "object",
+      "properties": {
+        "event": { "type": "string", "description": "Hook event name (e.g. PreToolUse). Omit to list all events." }
+      },
+      "additionalProperties": false
+    },
+
+    "ConfigInput": {
+      "type": "object",
+      "properties": {
+        "section": {
+          "type": "string",
+          "enum": ["all", "server", "log", "output", "lifecycle", "transport", "process"],
+          "default": "all",
+          "description": "Which config section to show. Default: all"
+        },
+        "key": { "type": "string", "description": "Key to set (e.g. level, format). Requires section + set_value" },
+        "set_value": { "description": "Value to set. Schema-validated on write", "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }] }
+      },
+      "additionalProperties": false
+    },
+    "CheckInput": {
+      "type": "object",
+      "properties": {
+        "verbose": { "type": "boolean", "default": false, "description": "Show full default values in results" }
+      },
+      "additionalProperties": false
+    },
+    "SchemaInput": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^[\\w.-]+\\.json$",
+          "default": "runtime.schema.json",
+          "description": "Schema file to inspect (e.g. runtime.schema.json, tools.json)"
+        },
+        "definition": { "type": "string", "description": "Definition name (e.g. LogConfig). Omit to list all definitions" },
+        "data": { "description": "Optional data to validate against the definition" },
+        "event": { "type": "string", "pattern": "^[A-Za-z]+$", "description": "Hook event name (legacy shortcut, e.g. PreToolUse)" }
+      },
+      "additionalProperties": false
+    },
+    "LogsInput": {
+      "type": "object",
+      "properties": {
+        "level": { "type": "string", "enum": ["debug", "info", "warn", "error"], "description": "Filter by log level" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50, "description": "Number of log entries" }
+      },
+      "additionalProperties": false
+    },
+    "AnalyticsInput": {
+      "type": "object",
+      "properties": {
+        "rule": { "type": "string", "description": "Filter by rule name" },
+        "event": { "type": "string", "description": "Filter by event type" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100000, "default": 10000, "description": "Max log entries to scan" }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "tools": [
+    {
+      "name": "hooks_rules",
+      "description": "Hook rule management. Actions: list: List rules with filters, get: Get rule by name, create: Create new rule, update: Update rule, delete: Delete rule, toggle: Enable/disable rule, validate: Validate rule syntax, test: Test rule against mock event, template: Show rule templates per event/action (Draft-07 format)",
+      "actions": [
+        { "name": "list",     "summary": "List rules with optional filters",          "inputSchema": { "$ref": "#/definitions/RuleListInput" } },
+        { "name": "get",      "summary": "Get a rule by name",                        "inputSchema": { "$ref": "#/definitions/NameInput" } },
+        { "name": "create",   "summary": "Create a new rule",                         "inputSchema": { "$ref": "#/definitions/NameContentInput" } },
+        { "name": "update",   "summary": "Update an existing rule",                   "inputSchema": { "$ref": "#/definitions/NameContentInput" } },
+        { "name": "delete",   "summary": "Delete a rule",                             "inputSchema": { "$ref": "#/definitions/NameInput" } },
+        { "name": "toggle",   "summary": "Enable or disable a rule",                  "inputSchema": { "$ref": "#/definitions/RuleToggleInput" } },
+        { "name": "validate", "summary": "Validate rule syntax (Draft-07 schema)",   "inputSchema": { "$ref": "#/definitions/RuleValidateInput" } },
+        { "name": "test",     "summary": "Test rule matching against mock event",     "inputSchema": { "$ref": "#/definitions/RuleTestInput" } },
+        { "name": "template", "summary": "Show rule templates per event/action (Draft-07 format)", "inputSchema": { "$ref": "#/definitions/RuleTemplateInput" } }
+      ]
+    },
+    {
+      "name": "hooks_admin",
+      "description": "Hook system administration. Actions: config, check, status, reload, restart, pause, resume, schema, logs, analytics",
+      "actions": [
+        { "name": "config",    "summary": "Show or set runtime configuration",              "inputSchema": { "$ref": "#/definitions/ConfigInput" } },
+        { "name": "check",     "summary": "Validate schema defaults are complete",          "inputSchema": { "$ref": "#/definitions/CheckInput" } },
+        { "name": "status",    "summary": "System status: rules, uptime, bus stats",        "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
+        { "name": "reload",    "summary": "Hot reload rules from disk",                     "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
+        { "name": "restart",   "summary": "Restart MCP server to reload config and tools",  "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
+        { "name": "pause",     "summary": "Pause all hook rules (pass-through mode)",       "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
+        { "name": "resume",    "summary": "Resume hook rules after pause",                  "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
+        { "name": "schema",    "summary": "Inspect schema definitions or validate data",    "inputSchema": { "$ref": "#/definitions/SchemaInput" } },
+        { "name": "logs",      "summary": "View hook processing logs (all levels)",         "inputSchema": { "$ref": "#/definitions/LogsInput" } },
+        { "name": "analytics", "summary": "Per-rule match count, deny rate, avg latency",   "inputSchema": { "$ref": "#/definitions/AnalyticsInput" } }
+      ]
+    }
+  ]
+}

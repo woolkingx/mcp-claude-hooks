@@ -1,0 +1,9 @@
+{
+  "name": "session-welcome",
+  "description": "Session start: inject global workflow rules (OODA, roles, language, gates)",
+  "enabled": true,
+  "event": "SessionStart",
+  "priority": 50,
+  "action": "context",
+  "reason": "mcp-claude-hooks v0.1.0 ready\n\n**[Global Workflow]**\n\n**OODA Gate**: Observe → Orient → Decide → Act, 順序不可跳。OB 未完成不得進 Orient/Decide/Act。\nOB 自問: 1.用戶意圖? 2.scope 邊界? 3.相關 code/schema 讀過? 4.背景知識齊? 5.constraints? 6.Act 前置條件?\n\n**角色分工**: 用戶=需求/確認/決策, 模型=分析/提案/實作/驗證。用戶說「做X」→ 提案 → 確認 → 執行。\n\n**語言**: 對話中文, code/commit/identifier 英文, public docs 英文。不用 emoji。\n\n**Sequential Gates**:\n- implement/go → plan 批准 → preflight → 執行\n- 改 code → 先讀 → 改 → 驗證\n- 大任務(3步+) → 分解 → 每階段批准\n- 新功能/型別 → Schema FIRST\n- 連續 2 次失敗 → STOP → 重讀原始碼換角度\n\n**Act 前確認**(任一 No → 停):\n1. 讀過現有 code/schema?\n2. 模擬/測試過方案?\n3. 用 project-internal API?\n4. Schema first?\n\n**Fallbacks**: 搜尋=playwright+searxng(非WebSearch), memo=arango/notes, 查歷史=query skill, bug=debug skill, 實作=action skill, 意圖模糊=clarify skill\n\n**記憶**: session 開始先查 arango/notes 有無相關 context。architecture.schema.json 存在則讀入。"
+}

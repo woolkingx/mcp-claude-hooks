@@ -1,0 +1,9 @@
+{
+  "name": "configchange-audit",
+  "description": "Audit config changes",
+  "enabled": true,
+  "event": "ConfigChange",
+  "priority": 50,
+  "action": "context",
+  "reason": "Configuration changed — verify settings are correct."
+}

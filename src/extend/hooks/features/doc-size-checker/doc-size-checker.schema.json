@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features/doc-size-checker/doc-size-checker.schema.json",
+  "title": "DocSizeChecker Feature Config",
+  "description": "Word count thresholds for documentation file size warnings.",
+  "type": "object",
+  "properties": {
+    "warn":  { "type": "integer", "minimum": 1, "default": 300, "description": "Word count threshold for WARN level." },
+    "error": { "type": "integer", "minimum": 1, "default": 500, "description": "Word count threshold for ERROR level." }
+  },
+  "additionalProperties": false,
+  "x-docs": {
+    "intent": "Warn when doc files (CLAUDE.md, AGENTS.md, GEMINI.md) exceed word thresholds. Every word in these files costs tokens on every request.",
+    "category": "feature",
+    "notes": "warn < error required. Returns null when below warn threshold."
+  }
+}

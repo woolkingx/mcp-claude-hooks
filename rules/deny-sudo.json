@@ -1,0 +1,16 @@
+{
+  "name": "deny-sudo",
+  "description": "Block sudo",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 90,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "sudo 命令需要用戶協助執行\n請複製命令到終端機手動執行",
+  "match_bash": {
+    "properties": {
+      "name": { "properties": { "text": { "const": "sudo" } } }
+    },
+    "required": ["name"]
+  }
+}

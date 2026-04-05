@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "engine.schema.json",
+  "title": "Hooks Engine",
+  "description": "Core hooks engine. Orchestrates rule matching, feature execution, and dedup state.",
+  "type": "object",
+  "x-methods": {
+    "processEvent": {
+      "args": ["event"],
+      "returns": "object|null",
+      "description": "Process a hook event through the pipeline: match rules → check fired state → execute features."
+    },
+    "loadEventSchema": {
+      "args": ["eventName"],
+      "returns": "object|null",
+      "description": "Load the schema for a named hook event (e.g. 'PreToolUse', 'PostToolUse')."
+    }
+  },
+  "properties": {
+    "paused": {
+      "type": "boolean",
+      "readOnly": true,
+      "description": "True if all rule processing is paused (pass-through mode)."
+    }
+  },
+  "x-docs": {
+    "intent": "Engine module acts as the glue between rules, features, and state. Not directly exposed via bus; called by hook.mjs internally.",
+    "category": "engine.hooks.core"
+  }
+}

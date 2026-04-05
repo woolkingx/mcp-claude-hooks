@@ -1,0 +1,24 @@
+{
+  "name": "protect-sensitive-files",
+  "description": "Block reading secret/credential files",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 95,
+  "tool": "Read",
+  "action": "deny",
+  "reason": "Reading secret/credential files is blocked.\nAsk the user to provide the values directly.",
+  "match": {
+    "required": ["tool_input"],
+    "properties": {
+      "tool_input": {
+        "required": ["file_path"],
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "(\\.env$|\\.env\\.|(/|^)credentials(/|$)|(^|/)id_rsa$|(^|/)id_ed25519$|\\.pem$|\\.key$)"
+          }
+        }
+      }
+    }
+  }
+}

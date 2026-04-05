@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "rules.schema.json",
+  "title": "Rules Module",
+  "description": "Rule-index module for O(1) event lookup. Exports getRulesForEvent(eventName) via bus handle 'rules:get'.",
+  "x-methods": {
+    "get": {
+      "args": ["eventName"],
+      "returns": "Rule[]",
+      "description": "Get all enabled rules for a specific hook event, sorted by priority."
+    },
+    "reload": {
+      "args": [],
+      "returns": "void",
+      "description": "Rebuild the rule index from disk, re-reading rules files."
+    }
+  },
+
+  "definitions": {
+    "Rule": {
+      "type": "object",
+      "description": "Single rule definition. Matches events and executes actions with optional conditional logic.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique rule name (identifier)."
+        },
+        "event": {
+          "type": "string",
+          "description": "Hook event this rule matches (e.g. 'PreToolUse', 'PostToolUse')."
+        },
+        "priority": {
+          "type": "integer",
+          "default": 50,
+          "description": "Execution order within event. Lower = earlier."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "If false, rule is skipped at load time."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["allow", "deny", "log", "transform", "throttle"],
+          "description": "Action to take when rule matches."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the rule (audit trail)."
+        },
+        "feature": {
+          "type": "string",
+          "description": "Feature flag or tag for grouping related rules."
+        },
+        "tool": {
+          "type": "string",
+          "description": "Optional tool name/pattern this rule applies to."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Optional working directory context for this rule."
+        },
+        "transform": {
+          "type": "object",
+          "description": "Optional transformation logic applied when rule matches."
+        }
+      },
+      "required": ["name", "event", "action"]
+    },
+    "RuleIndex": {
+      "type": "object",
+      "description": "Compiled rule index state. Map<eventName, rule[]> built at boot and rebuild on reload.",
+      "properties": {
+        "map": {
+          "type": "object",
+          "description": "Internal: Map serialized as object for reference. Not part of config."
+        },
+        "loadedAt": {
+          "type": "integer",
+          "description": "Timestamp when rules were last loaded."
+        },
+        "ruleCount": {
+          "type": "integer",
+          "description": "Total rules loaded."
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "title": "Rules Module Setup Contract",
+  "description": "setup(bus, config) → teardown. Loads rules from config.rulesDir, builds Map<eventName, rule[]> for O(1) lookup.",
+  "properties": {
+    "setup": {
+      "type": "string",
+      "const": "function setup(bus, config) → function teardown()",
+      "description": "Module entry point. Returns teardown function."
+    },
+    "exports": {
+      "type": "object",
+      "description": "Public API via bus handles.",
+      "properties": {
+        "rules:get": {
+          "type": "object",
+          "description": "Get rules for event. Input: {eventName}. Output: {rules: Rule[]}.",
+          "properties": {
+            "input": {
+              "type": "object",
+              "properties": {
+                "eventName": {
+                  "type": "string",
+                  "description": "Hook event name (e.g. 'PreToolUse', 'PostToolUse')"
+                }
+              },
+              "required": ["eventName"]
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "rules": {
+                  "type": "array",
+                  "items": { "type": "object" },
+                  "description": "Enabled rules for event, sorted by priority (lower = first)."
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "rules:reload": {
+          "type": "object",
+          "description": "Rebuild rule index from disk. Input: {}. Output: {reloaded: true}."
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Runtime configuration.",
+      "properties": {
+        "rulesDir": {
+          "type": "string",
+          "default": "rules/",
+          "description": "Directory containing rule JSON files. Relative to projectRoot or absolute."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "worktreeremove-cleanup-check",
+  "description": "Check cleanup on worktree remove",
+  "enabled": true,
+  "event": "WorktreeRemove",
+  "priority": 50,
+  "action": "context",
+  "reason": "Worktree removed — verify cleanup completed."
+}

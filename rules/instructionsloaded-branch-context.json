@@ -1,0 +1,9 @@
+{
+  "name": "instructionsloaded-branch-context",
+  "description": "Branch context on instructions loaded",
+  "enabled": true,
+  "event": "InstructionsLoaded",
+  "priority": 50,
+  "action": "context",
+  "reason": "Instructions loaded — check current branch context."
+}

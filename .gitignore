@@ -1,0 +1,15 @@
+
+.claude/
+.cleanup/
+.backup/
+run/
+logs/
+scripts/sync_release.py
+.remember/
+graph-report.json
+graph-report.txt
+docs/refactor-jster-pattern.md
+docs/task-hook-state.schema.json
+package-lock.json
+src/project/config/agent.schema.json
+scripts/

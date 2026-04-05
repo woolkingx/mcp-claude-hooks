@@ -1,0 +1,24 @@
+{
+  "name": "ask-chmod",
+  "description": "Ask before running chmod",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 70,
+  "tool": "Bash",
+  "action": "ask",
+  "reason": "chmod will change file permissions.\nConfirm?",
+  "match_bash": {
+    "properties": {
+      "name": {
+        "properties": {
+          "text": {
+            "const": "chmod"
+          }
+        }
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }
+}

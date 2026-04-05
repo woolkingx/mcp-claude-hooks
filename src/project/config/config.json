@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Config",
+  "description": "Root schema — single entry point for all configuration. $ref chains: config → runtime + protocol + tools.",
+
+  "definitions": {
+    "OutputFormat": {
+      "type": "string",
+      "enum": ["json", "md", "file"],
+      "default": "md",
+      "description": "json: raw JSON, md: Markdown (saves ~40% tokens), file: write to disk and return path"
+    }
+  },
+
+  "type": "object",
+  "properties": {
+    "protocol":  { "$ref": "mcp-schema.json" },
+    "transport": { "$ref": "transport.schema.json" },
+    "runtime":   { "$ref": "runtime.schema.json" },
+    "tools":     { "$ref": "tools.json" },
+    "hook":      { "$ref": "hook.schema.json" }
+  },
+  "additionalProperties": false
+}

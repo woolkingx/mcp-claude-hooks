@@ -1,0 +1,9 @@
+{
+  "name": "session-deep-reasoning",
+  "description": "Session start: enable deep reasoning output style by default",
+  "enabled": true,
+  "event": "SessionStart",
+  "priority": 45,
+  "action": "context",
+  "reason": "**[Output Style]** Use deep reasoning by default:\n- Show reasoning chain, not just conclusions\n- Analyze tradeoffs explicitly before deciding\n- When multiple approaches exist: list → compare → recommend → wait for pick\n- Technical depth > brevity — don't oversimplify\n- If uncertain: state confidence level, show what you checked vs assumed"
+}

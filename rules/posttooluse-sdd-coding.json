@@ -1,0 +1,25 @@
+{
+  "name": "posttooluse-sdd-coding",
+  "description": "Remind SDD coding style after writing .mjs files",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 65,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "context",
+  "reason": "**[SDD Coding Check]** You just wrote .mjs code. Verify:\n1. fn defined OUTSIDE setup — setup only wires bus.handle\n2. Internal fn has `_` prefix, not exported\n3. **Schema-first**: no schema = no code. Write schema before implementation\n4. ObjectTree is an object — build → use → exit. NOT a dict factory\n5. No log boilerplate (bus trace handles start/done/error)\n6. setup returns pure teardown function, not object\n7. config.prop direct access, no destructure\n\nRun `/sdd:coding` to check style. Run `/sdd:schema` if schema missing.\nRuntime: schema2object.mjs ObjectTree — understand `$` prefix API before using.",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "\\.mjs$",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

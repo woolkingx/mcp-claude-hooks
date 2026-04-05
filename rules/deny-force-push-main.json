@@ -1,0 +1,44 @@
+{
+  "name": "deny-force-push-main",
+  "description": "Block force push to main/master",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 100,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "NEVER force push to main/master.\nThis is a destructive operation that overwrites shared history.",
+  "match_bash": {
+    "allOf": [
+      {
+        "properties": {
+          "name": { "properties": { "text": { "const": "git" } } }
+        },
+        "required": ["name"]
+      },
+      {
+        "properties": {
+          "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "push" } } } }
+        }
+      },
+      {
+        "anyOf": [
+          {
+            "properties": {
+              "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "--force" } } } }
+            }
+          },
+          {
+            "properties": {
+              "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "-f" } } } }
+            }
+          },
+          {
+            "properties": {
+              "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "--force-with-lease" } } } }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

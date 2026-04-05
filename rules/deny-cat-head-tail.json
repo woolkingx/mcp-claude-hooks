@@ -1,0 +1,28 @@
+{
+  "name": "deny-cat-head-tail",
+  "description": "Block cat/head/tail, use Read tool",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Use the Read tool instead of cat/head/tail in Bash.",
+  "match_bash": {
+    "properties": {
+      "name": {
+        "properties": {
+          "text": {
+            "enum": [
+              "cat",
+              "head",
+              "tail"
+            ]
+          }
+        }
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }
+}

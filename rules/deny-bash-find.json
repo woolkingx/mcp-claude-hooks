@@ -1,0 +1,16 @@
+{
+  "name": "deny-bash-find",
+  "description": "Block find, suggest Glob",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Use the Glob tool instead of find in Bash.",
+  "match_bash": {
+    "properties": {
+      "name": { "properties": { "text": { "const": "find" } } }
+    },
+    "required": ["name"]
+  }
+}

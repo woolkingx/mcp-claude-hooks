@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Features Registry",
+  "description": "Module contract for feature registry. Manages self-describing feature modules.",
+  "type": "object",
+  "x-methods": {
+    "execute": {
+      "args": ["ruleFeature", "event"],
+      "returns": "string|null",
+      "description": "Execute a single feature on an event. Returns response string or null."
+    },
+    "list": {
+      "args": [],
+      "returns": "string[]",
+      "description": "List all available feature names."
+    }
+  },
+  "definitions": {
+    "FeatureExecuteRequest": {
+      "type": "object",
+      "title": "feature:execute",
+      "description": "Execute a single feature on an event with optional config",
+      "required": ["name", "event"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Feature name (lint, doc-size-checker)"
+        },
+        "event": {
+          "type": "object",
+          "description": "Hook event object from rules engine",
+          "properties": {
+            "hook_event_name": { "type": "string" },
+            "session_id": { "type": "string" },
+            "cwd": { "type": "string" },
+            "tool_input": { "type": "object" }
+          }
+        },
+        "featureConfig": {
+          "type": "object",
+          "description": "Feature-specific configuration"
+        }
+      }
+    },
+    "FeatureListResponse": {
+      "type": "array",
+      "title": "feature:list",
+      "description": "List all available features",
+      "items": { "type": "string" }
+    }
+  },
+  "x-docs": {
+    "intent": "Provide unified feature execution. Features are self-describing modules.",
+    "category": "engine.hooks.features",
+    "bus-handles": [
+      "feature:execute",
+      "feature:list"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "elicitationresult-process",
+  "description": "Process elicitation result",
+  "enabled": true,
+  "event": "ElicitationResult",
+  "priority": 50,
+  "action": "context",
+  "reason": "User responded to MCP elicitation — process and validate the response"
+}

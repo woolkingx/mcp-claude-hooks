@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "admin.schema.json",
+  "title": "Admin Module",
+  "description": "System administration: config inspection, status, reload, restart, pause/resume, schema, logs, analytics.",
+
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name":    { "type": "string", "const": "admin" },
+    "version": { "type": "string", "const": "0.1.0" },
+    "depends": { "type": "array", "default": ["rules", "engine"] },
+
+    "handles": {
+      "type": "array",
+      "default": [
+        { "event": "hooks_admin:config",    "description": "Read current runtime config (minus x-internal fields)." },
+        { "event": "hooks_admin:status",    "description": "System health: uptime, rule count, daemon status, engine state." },
+        { "event": "hooks_admin:reload",    "description": "Reload rules via bus.send('engine:reload')." },
+        { "event": "hooks_admin:restart",   "description": "Restart daemon process." },
+        { "event": "hooks_admin:pause",     "description": "Pause hook processing (pass-through mode)." },
+        { "event": "hooks_admin:resume",    "description": "Resume hook processing." },
+        { "event": "hooks_admin:schema",    "description": "Return schema for a given section or rule field." },
+        { "event": "hooks_admin:logs",      "description": "Read from hook-audit.jsonl with optional filters." },
+        { "event": "hooks_admin:analytics", "description": "Aggregate rule match statistics from audit log." }
+      ]
+    },
+
+    "listens": { "type": "array", "default": [] },
+    "emits":   { "type": "array", "default": [] }
+  },
+
+  "definitions": {
+    "StatusReport": {
+      "type": "object",
+      "description": "Output of admin:status.",
+      "properties": {
+        "uptime":      { "type": "number", "description": "Process uptime in seconds." },
+        "ruleCount":   { "type": "integer" },
+        "daemon":      { "type": "object", "properties": { "running": { "type": "boolean" }, "pid": { "type": "integer" } } },
+        "paused":      { "type": "boolean" }
+      }
+    }
+  },
+
+  "x-note": "admin:reload calls bus.send('engine:reload') — does NOT import engine or rules module directly.",
+
+  "x-tests": {
+    "config":    ["returns_runtime_config", "excludes_x_internal_fields"],
+    "status":    ["includes_uptime", "includes_rule_count", "daemon_running"],
+    "reload":    ["sends_engine_reload_via_bus", "no_direct_import"],
+    "pause":     ["sets_paused_flag", "engine_passes_through_when_paused"],
+    "logs":      ["reads_audit_jsonl", "filters_by_event", "limits_results"],
+    "analytics": ["counts_by_rule", "counts_by_action", "top_matched"]
+  }
+}

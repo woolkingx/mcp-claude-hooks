@@ -1,0 +1,22 @@
+{
+  "name": "check-markdown-writing",
+  "description": "Check markdown after writing",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 50,
+  "tool": "Write",
+  "action": "context",
+  "reason": "Review: Active voice, omit needless words, concrete language.",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "\\.md$"
+          }
+        }
+      }
+    }
+  }
+}

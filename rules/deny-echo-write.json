@@ -1,0 +1,17 @@
+{
+  "name": "deny-echo-write",
+  "description": "Block echo/printf redirect to file (> or >>). Pipe to process is allowed.",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Use Write tool instead of echo/printf redirect.\nWrite tool provides better file creation review.",
+  "match_bash": {
+    "properties": {
+      "name": { "properties": { "text": { "enum": ["echo", "printf"] } } },
+      "redirects": { "type": "array", "contains": { "properties": { "operator": { "enum": [">", ">>"] } } } }
+    },
+    "required": ["name", "redirects"]
+  }
+}

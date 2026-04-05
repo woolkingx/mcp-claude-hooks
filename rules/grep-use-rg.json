@@ -1,0 +1,29 @@
+{
+  "name": "grep-use-rg",
+  "description": "Block grep in bash, use Grep tool",
+  "enabled": false,
+  "event": "PreToolUse",
+  "priority": 10,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Use the Grep tool instead of grep/rg in Bash.\nGrep tool is a built-in ripgrep wrapper with better UX.",
+  "match_bash": {
+    "properties": {
+      "name": {
+        "properties": {
+          "text": {
+            "enum": [
+              "grep",
+              "rg",
+              "egrep",
+              "fgrep"
+            ]
+          }
+        }
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }
+}

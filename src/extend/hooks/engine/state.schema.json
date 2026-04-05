@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "state.schema.json",
+  "title": "Dedup State Manager",
+  "description": "Manages rule dedup state: which rules have fired in which sessions. Supports per-session and per-rule repeat logic.",
+  "type": "object",
+  "x-methods": {
+    "hasFired": {
+      "args": ["sessionId", "ruleName", "repeat"],
+      "returns": "boolean",
+      "description": "Check if a rule has already fired in this session (respects repeat: false/N cooldown)."
+    },
+    "markFired": {
+      "args": ["sessionId", "ruleName"],
+      "returns": "void",
+      "description": "Record that a rule fired in a session."
+    },
+    "clearSession": {
+      "args": ["sessionId"],
+      "returns": "void",
+      "description": "Remove all dedup state for a session (on session end)."
+    },
+    "dump": {
+      "args": [],
+      "returns": "object",
+      "description": "Export full dedup state as JSON for backup/inspection."
+    },
+    "restore": {
+      "args": ["data"],
+      "returns": "void",
+      "description": "Restore dedup state from backup JSON."
+    }
+  },
+  "x-docs": {
+    "intent": "Singleton state object. Persisted to run/hook-state.json. Prevents rule firing repeatedly within a session, saving tokens and avoiding duplicate processing.",
+    "category": "engine.hooks.state"
+  }
+}

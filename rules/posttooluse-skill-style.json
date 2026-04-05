@@ -1,0 +1,25 @@
+{
+  "name": "posttooluse-skill-style",
+  "description": "Remind skill/agent writing: token-level rules, ✅/❌ pairs",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 60,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "context",
+  "reason": "**[Skill/Agent Style]** You just edited a skill or agent definition. Check:\n1. Rules specific to TOKEN level — not abstract principles\n2. Every rule has ✅ positive + ❌ negative example pair\n3. No explanatory text (reader is a model, not a human)\n4. Use `<critical>` tag for hard constraints with checklist\n5. Structured: tables > paragraphs, checklists > prose\n6. Under 300 lines (200 preferred) — long skills get truncated\n7. If rule can be enforced by hook → move to hook rule instead",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "(skills|agents)/.*\\.(md|mjs)$",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

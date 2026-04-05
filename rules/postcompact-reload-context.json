@@ -1,0 +1,9 @@
+{
+  "name": "postcompact-reload-context",
+  "description": "Reload context after compaction",
+  "enabled": true,
+  "event": "PostCompact",
+  "priority": 50,
+  "action": "context",
+  "reason": "Context compacted — reload CLAUDE.md rules."
+}

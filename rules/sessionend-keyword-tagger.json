@@ -1,0 +1,9 @@
+{
+  "name": "sessionend-keyword-tagger",
+  "description": "Session end: save insights to arango/notes + keyword tags",
+  "enabled": true,
+  "event": "SessionEnd",
+  "priority": 50,
+  "action": "context",
+  "reason": "**[Session End]**\n1. 存 insights 到 arango/notes (用 note skill)\n2. Generate keyword tags for this session\n3. architecture.schema.json 有變動則更新\n4. 記錄: 決策、發現的 bug pattern、用戶偏好、project context 變化"
+}

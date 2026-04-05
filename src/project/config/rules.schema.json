@@ -1,0 +1,255 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "rules.schema.json",
+  "title": "Hook Rule",
+  "description": "Schema for Claude Code hook rules. Each rule defines when and how to intercept a hook event.",
+
+  "definitions": {
+
+    "HookEvent": {
+      "type": "string",
+      "description": "Claude Code hook lifecycle event.",
+      "enum": [
+        "PreToolUse", "PostToolUse", "PostToolUseFailure",
+        "UserPromptSubmit", "PermissionRequest",
+        "SessionStart", "SessionEnd",
+        "Stop", "StopFailure", "Notification",
+        "SubagentStart", "SubagentStop",
+        "PreCompact", "PostCompact",
+        "TeammateIdle", "TaskCompleted", "TaskCreated",
+        "ConfigChange", "InstructionsLoaded",
+        "WorktreeCreate", "WorktreeRemove",
+        "Elicitation", "ElicitationResult",
+        "Setup", "CwdChanged", "FileChanged"
+      ]
+    },
+
+    "Action": {
+      "type": "string",
+      "description": "What to do when the rule matches.",
+      "enum": ["deny", "allow", "ask", "context", "transform", "welcome", "stderr", "notify", "load"],
+      "x-descriptions": {
+        "deny":      "Block the operation, return reason to Claude",
+        "allow":     "Explicitly allow (skip further rules)",
+        "ask":       "Ask user for confirmation before proceeding",
+        "context":   "Inject additionalContext into Claude's response",
+        "transform": "Modify the tool input before execution",
+        "welcome":   "Send systemMessage on session/lifecycle events",
+        "stderr":    "Write reason to stderr (visible to user, not Claude)",
+        "notify":    "Send systemMessage notification",
+        "load":      "Load file contents into additionalContext (requires loaders field)"
+      }
+    },
+
+    "Draft07Schema": {
+      "description": "Draft-07 JSON Schema used as match condition. ObjectTree(data, schema) succeeds = match.",
+      "type": "object",
+      "additionalProperties": true
+    },
+
+    "UnbashCommand": {
+      "description": "unbash Command node. match_bash schemas match against this structure.",
+      "type": "object",
+      "properties": {
+        "type":      { "type": "string", "const": "Command" },
+        "name":      { "type": "object", "properties": { "text": { "type": "string" } } },
+        "suffix":    { "type": "array",  "items": { "type": "object", "properties": { "text": { "type": "string" } } } },
+        "prefix":    { "type": "array",  "items": { "type": "object", "properties": { "text": { "type": "string" } } } },
+        "redirects": { "type": "array",  "items": { "type": "object", "properties": { "operator": { "type": "string" }, "content": { "type": "string" } } } }
+      },
+      "x-example": {
+        "type": "Command",
+        "name": { "text": "git" },
+        "suffix": [{ "text": "push" }, { "text": "--force" }, { "text": "main" }],
+        "redirects": []
+      },
+      "x-match-patterns": {
+        "cmd-const":    "name: { properties: { text: { const: 'X' } } }",
+        "cmd-enum":     "name: { properties: { text: { enum: ['X','Y'] } } }",
+        "arg-contains": "suffix: { type: 'array', contains: { properties: { text: { const: 'X' } } } }",
+        "redirect-out": "redirects: { type: 'array', contains: { properties: { operator: { enum: ['>','>>'] } } } }",
+        "required-cmd": "required: ['name']  (top-level only, never inside property sub-schema)"
+      }
+    },
+
+    "ToolMatcher": {
+      "description": "Quick filter by tool name. Applied before match/match_bash.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+
+    "Rule": {
+      "type": "object",
+      "required": ["name", "event", "action", "enabled"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Unique rule identifier. Used as filename: {name}.json"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this rule does."
+        },
+        "enabled": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "const": "test" }
+          ],
+          "default": true,
+          "description": "true = active, false = disabled, 'test' = match + log but no action (dry-run)."
+        },
+        "event": {
+          "$ref": "#/definitions/HookEvent"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 50,
+          "description": "Execution order. Lower = runs first. 0-20: allow/fast-path, 30-60: normal, 70-100: catch-all."
+        },
+        "tool": {
+          "$ref": "#/definitions/ToolMatcher"
+        },
+        "cwd": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Project filter by cwd. Matches if event.cwd contains any of the given strings (project name or path fragment). Rules without cwd apply globally."
+        },
+        "match": {
+          "$ref": "#/definitions/Draft07Schema",
+          "description": "Draft-07 schema to validate against event object. ObjectTree(event, match) succeeds = match."
+        },
+        "match_bash": {
+          "$ref": "#/definitions/Draft07Schema",
+          "description": "Draft-07 schema matched against unbash Command nodes. See UnbashCommand definition for structure. required: [...] goes at top level only — never inside nested property sub-schemas."
+        },
+        "action": {
+          "$ref": "#/definitions/Action"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Message shown to Claude when rule triggers (deny/ask). Supports markdown."
+        },
+        "feature": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Feature name shorthand (e.g. 'lint'). No config."
+            },
+            {
+              "type": "object",
+              "description": "Feature with config object.",
+              "properties": {
+                "name":   { "type": "string", "description": "Feature module name." },
+                "config": { "type": "object", "additionalProperties": true, "description": "Feature-specific configuration passed to the feature function." }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Feature module to invoke when action is 'context' or 'transform'. Use string for no-config features, object for features requiring configuration."
+        },
+        "transform": {
+          "type": "object",
+          "description": "Transformation spec when action is 'transform'. Feature-specific.",
+          "additionalProperties": true
+        },
+        "updatedInput": {
+          "type": "object",
+          "description": "Static transform config: {field, pattern, replace}. Applied when action is 'transform'.",
+          "properties": {
+            "field":   { "type": "string", "default": "command" },
+            "pattern": { "type": "string", "description": "Regex pattern to match. Validated at load time." },
+            "flags":   { "type": "string", "pattern": "^[gimsuy]*$", "description": "Regex flags. Only gimsuy allowed." },
+            "replace": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "loaders": {
+          "type": "array",
+          "description": "File loaders for 'load' action. Each loads a file into additionalContext.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type":   { "type": "string", "enum": ["file"], "default": "file" },
+              "path":   { "type": "string", "pattern": "^(~|\\/home|\\/var\\/log|\\.)", "description": "File path (supports ~). Must be under home, /var/log, or relative." },
+              "label":  { "type": "string", "description": "Section label in output" },
+              "enable": { "type": "boolean", "default": true }
+            },
+            "required": ["path"]
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for grouping and filtering rules."
+        },
+        "agent": {
+          "type": "object",
+          "description": "Agent configuration: spawn subagent to handle the event. Agent receives event context and can use specified tools.",
+          "properties": {
+            "model": { "type": "string", "description": "Model to use (e.g. 'haiku', 'sonnet')" },
+            "tools": { "type": "array", "items": { "type": "string" }, "description": "Tools the agent can access" },
+            "prompt": { "type": "string", "description": "System prompt / instructions for the agent" }
+          },
+          "additionalProperties": true
+        },
+        "repeat": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "default": true,
+          "description": "true = fire every time (default). false = once per session. integer = cooldown seconds."
+        }
+      },
+      "additionalProperties": false,
+
+      "if": { "properties": { "action": { "const": "deny" } } },
+      "then": { "required": ["reason"] },
+
+      "x-examples": {
+        "deny-rm": {
+          "name": "deny-rm",
+          "description": "Block rm command, suggest mv to .cleanup/ or .backup/",
+          "enabled": true,
+          "event": "PreToolUse",
+          "priority": 50,
+          "tool": "Bash",
+          "match_bash": { "properties": { "name": { "properties": { "text": { "const": "rm" } } } }, "required": ["name"] },
+          "action": "deny",
+          "reason": "rm is disabled. Use: mv file .cleanup/"
+        },
+        "redirect-websearch": {
+          "name": "redirect-websearch",
+          "description": "Redirect WebSearch to MCP search tools",
+          "enabled": true,
+          "event": "PreToolUse",
+          "priority": 10,
+          "tool": "WebSearch",
+          "action": "deny",
+          "reason": "Use mcp__mcp-playwright-aio__custom (action: search_web) instead."
+        },
+        "posttooluse-lint": {
+          "name": "posttooluse-lint",
+          "description": "Auto-lint after Edit/Write",
+          "enabled": false,
+          "event": "PostToolUse",
+          "priority": 5,
+          "tool": ["Edit", "Write"],
+          "action": "context",
+          "feature": "lint"
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "$ref": "#/definitions/Rule"
+}

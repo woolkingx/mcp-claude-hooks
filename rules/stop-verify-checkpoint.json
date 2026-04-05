@@ -1,0 +1,10 @@
+{
+  "name": "stop-verify-checkpoint",
+  "description": "Verify + auto-note on stop",
+  "enabled": true,
+  "event": "Stop",
+  "priority": 50,
+  "action": "context",
+  "reason": "Before stopping: 1) Verify actions met user's target/requirement. 2) Auto-save session insights/decisions/patterns to arango/notes via /note skill — do NOT ask, just write. User will correct if wrong.",
+  "repeat": false
+}

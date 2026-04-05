@@ -1,0 +1,10 @@
+{
+  "name": "deny-webfetch",
+  "description": "Deny WebFetch",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 10,
+  "tool": "WebFetch",
+  "action": "deny",
+  "reason": "WebFetch disabled.\nUse: mcp__mcp-playwright-aio__navigation (action: navigate)"
+}

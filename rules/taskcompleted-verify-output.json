@@ -1,0 +1,9 @@
+{
+  "name": "taskcompleted-verify-output",
+  "description": "Verify task output",
+  "enabled": true,
+  "event": "TaskCompleted",
+  "priority": 50,
+  "action": "context",
+  "reason": "Task completed — verify output meets requirements."
+}

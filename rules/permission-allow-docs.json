@@ -1,0 +1,21 @@
+{
+  "name": "permission-allow-docs",
+  "description": "PermissionRequest allow reading docs",
+  "enabled": false,
+  "event": "PermissionRequest",
+  "priority": 10,
+  "tool": "Read",
+  "action": "allow",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "(\\.md$|\\.txt$|\\.json$|\\.toml$)"
+          }
+        }
+      }
+    }
+  }
+}

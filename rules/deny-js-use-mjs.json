@@ -1,0 +1,25 @@
+{
+  "name": "deny-js-use-mjs",
+  "description": "Block creating/editing .js files, must use .mjs",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 40,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "deny",
+  "reason": "Use .mjs not .js. All JavaScript files must use ES module extension (.mjs).",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "\\.js$",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

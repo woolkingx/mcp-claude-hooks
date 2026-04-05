@@ -1,0 +1,16 @@
+{
+  "name": "deny-sed-awk",
+  "description": "Block sed/awk, use Edit tool",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Use the Edit tool instead of sed/awk in Bash.",
+  "match_bash": {
+    "properties": {
+      "name": { "properties": { "text": { "enum": ["sed", "awk"] } } }
+    },
+    "required": ["name"]
+  }
+}

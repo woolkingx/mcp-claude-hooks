@@ -1,0 +1,22 @@
+{
+  "name": "deny-memory-md",
+  "description": "Block direct file ops on MEMORY.md, use /note skill instead",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": ["Read", "Write", "Edit"],
+  "action": "deny",
+  "reason": "use /note skill to manage memory, not direct file operations on MEMORY.md",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "MEMORY\\.md",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

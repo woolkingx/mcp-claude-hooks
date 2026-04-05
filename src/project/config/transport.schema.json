@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transport",
+  "description": "MCP transport configuration. Defines how client-server communication works (stdio, Streamable HTTP, CLI).",
+
+  "type": "object",
+  "properties": {
+    "type":     { "type": "string", "enum": ["stdio", "sse", "cli"], "default": "stdio" },
+    "port":     { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8000 },
+    "host":     { "type": "string", "default": "127.0.0.1" },
+    "endpoint": { "type": "string", "default": "/mcp", "description": "MCP endpoint path for Streamable HTTP" },
+    "session": {
+      "type": "object",
+      "description": "MCP session management (Mcp-Session-Id header).",
+      "properties": {
+        "enabled":  { "type": "boolean", "default": true },
+        "idLength": { "type": "integer", "minimum": 16, "maximum": 128, "default": 32 }
+      },
+      "additionalProperties": false,
+      "default": { "enabled": true, "idLength": 32 }
+    },
+    "sse": {
+      "type": "object",
+      "description": "SSE stream behavior for Streamable HTTP.",
+      "properties": {
+        "retryMs":     { "type": "integer", "minimum": 500, "default": 3000, "description": "Client reconnect interval" },
+        "keepAliveMs": { "type": "integer", "minimum": 1000, "default": 15000, "description": "Heartbeat comment interval" },
+        "resumable":   { "type": "boolean", "default": false, "description": "Enable event ID for resumability" }
+      },
+      "additionalProperties": false,
+      "default": { "retryMs": 3000, "keepAliveMs": 15000, "resumable": false }
+    },
+    "cors": {
+      "type": "object",
+      "description": "CORS headers for Streamable HTTP.",
+      "properties": {
+        "allowOrigin":   { "type": "string", "default": "null" },
+        "allowMethods":  { "type": "string", "default": "GET, POST, DELETE, OPTIONS" },
+        "allowHeaders":  { "type": "string", "default": "Content-Type, Accept, Mcp-Session-Id" },
+        "exposeHeaders": { "type": "string", "default": "Mcp-Session-Id" }
+      },
+      "additionalProperties": false,
+      "default": { "allowOrigin": "null", "allowMethods": "GET, POST, DELETE, OPTIONS", "allowHeaders": "Content-Type, Accept, Mcp-Session-Id", "exposeHeaders": "Mcp-Session-Id" }
+    },
+    "http": {
+      "type": "object",
+      "description": "HTTP server limits.",
+      "properties": {
+        "maxBodySize": { "type": "integer", "minimum": 1024, "default": 1048576 },
+        "timeout":     { "type": "integer", "minimum": 0, "default": 15000 }
+      },
+      "additionalProperties": false,
+      "default": { "maxBodySize": 1048576, "timeout": 15000 }
+    }
+  },
+  "additionalProperties": false,
+  "default": {
+    "type": "stdio", "port": 8000, "host": "127.0.0.1", "endpoint": "/mcp",
+    "session": { "enabled": true, "idLength": 32 },
+    "sse": { "retryMs": 3000, "keepAliveMs": 15000, "resumable": false },
+    "cors": { "allowOrigin": "null", "allowMethods": "GET, POST, DELETE, OPTIONS", "allowHeaders": "Content-Type, Accept, Mcp-Session-Id", "exposeHeaders": "Mcp-Session-Id" },
+    "http": { "maxBodySize": 1048576, "timeout": 15000 }
+  }
+}

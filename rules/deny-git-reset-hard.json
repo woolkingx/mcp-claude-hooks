@@ -1,0 +1,30 @@
+{
+  "name": "deny-git-reset-hard",
+  "description": "Block git reset --hard",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 90,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "git reset --hard is destructive.\nCommit or stash your changes first.",
+  "match_bash": {
+    "allOf": [
+      {
+        "properties": {
+          "name": { "properties": { "text": { "const": "git" } } }
+        },
+        "required": ["name"]
+      },
+      {
+        "properties": {
+          "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "reset" } } } }
+        }
+      },
+      {
+        "properties": {
+          "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "--hard" } } } }
+        }
+      }
+    ]
+  }
+}

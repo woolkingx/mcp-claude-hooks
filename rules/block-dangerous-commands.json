@@ -1,0 +1,81 @@
+{
+  "name": "block-dangerous-commands",
+  "description": "Block rm -rf, mkfs, dd",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 100,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Dangerous command blocked",
+  "match_bash": {
+    "anyOf": [
+      {
+        "allOf": [
+          {
+            "properties": {
+              "name": {
+                "properties": {
+                  "text": {
+                    "const": "rm"
+                  }
+                }
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "suffix": {
+                    "type": "array",
+                    "contains": {
+                      "properties": {
+                        "text": {
+                          "pattern": "^-[a-zA-Z]*r"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "suffix": {
+                    "type": "array",
+                    "contains": {
+                      "properties": {
+                        "text": {
+                          "pattern": "^-[a-zA-Z]*f"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "name": {
+            "properties": {
+              "text": {
+                "enum": [
+                  "mkfs",
+                  "dd"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    ]
+  }
+}

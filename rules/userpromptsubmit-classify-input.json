@@ -1,0 +1,10 @@
+{
+  "name": "userpromptsubmit-classify-input",
+  "description": "Self-check gates before reasoning",
+  "enabled": true,
+  "event": "UserPromptSubmit",
+  "priority": 50,
+  "action": "context",
+  "reason": "Before reasoning, ask yourself:\n1. Am I following CLAUDE.md rules? (sequential gates, prohibitions, fallbacks, mutual exclusions)\n2. Is there a skill for this? Skills = reusable knowledge. Check skill list before reinventing.\n3. Is there a better agent to handle this? (Explore for research, subagents for parallel work, query skill for notes)",
+  "repeat": false
+}

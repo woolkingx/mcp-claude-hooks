@@ -1,0 +1,715 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mcp-claude-hooks/architecture",
+  "title": "mcp-claude-hooks Architecture",
+  "description": "Bus-centric architecture. Schema is the single source of truth. Bus is the core — all modules register handlers on bus. All adapters are interchangeable I/O shells. There is only ONE process, ONE bus, ONE engine. Adapters (MCP/CLI/SSE/hook) are transport skins.",
+
+  "$defs": {
+
+    "Layer": {
+      "type": "string",
+      "enum": ["core", "modules", "extends", "adapters"],
+      "description": "Architectural layer. core=runtime infrastructure (bus+schema2object+errors, direct calls OK). modules=generic capabilities (bus only, never import each other). extends=application compositions (compose modules for specific scenarios). adapters=I/O skins (stdio/sse/cli/daemon)."
+    },
+
+    "ImportSource": {
+      "type": "string",
+      "enum": ["node-stdlib", "core-direct", "bus-only", "core+adapters", "injection"],
+      "description": "core: node-stdlib + core-direct (direct calls within core are legal). modules: bus-only (no cross-module import). extends: bus-only + may declare children. adapters: injection (receives core via injection, never imports modules)."
+    },
+
+    "CoreComponent": {
+      "type": "object",
+      "description": "Core = runtime infrastructure. Always present. Cannot unload. Components communicate via direct function calls — bus is not required within core. Core provides: bus, schema2object (ObjectTree+Loader), errors, log, module loader.",
+      "required": ["name", "path", "responsibility"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string", "pattern": "^(foundation|server|lib)/[a-z0-9/-]+\\.mjs$" },
+        "responsibility": { "type": "string" },
+        "x-constraint": {
+          "type": "string",
+          "const": "Direct function calls within core are legal. Core never goes through bus.",
+          "description": "Core is the runtime — it cannot depend on what it provides."
+        }
+      }
+    },
+
+    "FeatureContract": {
+      "type": "object",
+      "description": "Features are engine plugins — named dynamic-value computers invoked after rule match. Not bus handlers. Not modules. Sync execution only: returns value immediately, passed to handler as featureResult.",
+      "required": ["name", "returns"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Registry key. Referenced by rule.feature field."
+        },
+        "returns": {
+          "type": "string",
+          "enum": ["string", "object", "null"],
+          "description": "Feature return type. Engine passes result to handler as featureResult parameter."
+        }
+      }
+    },
+
+    "BusMessage": {
+      "type": "object",
+      "description": "Semantic definition of a bus message. Bus is the runtime message fabric — all inter-module communication goes through bus. Two patterns: handle (one registered handler, request-response) and send (fire-and-forget, no reply expected).",
+      "required": ["event", "pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "$ref": "#/$defs/BusEventName" },
+        "pattern": {
+          "type": "string",
+          "enum": ["handle", "send"],
+          "description": "handle = exactly one handler registered via bus.handle(). send = publish event, zero or more listeners. engine:process uses handle. notifications use send."
+        },
+        "correlation": {
+          "type": "string",
+          "enum": ["request-response", "fire-and-forget"],
+          "description": "request-response: caller awaits reply (bus.send returns result). fire-and-forget: caller does not await."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Which module registers the handler for this event (handle pattern only)."
+        }
+      }
+    },
+
+    "DependencyRule": {
+      "type": "object",
+      "description": "Strict layering rules. Reverse dependency = bug. Module-to-module direct import = bug.",
+      "required": ["layer", "allowed_imports", "forbidden"],
+      "additionalProperties": false,
+      "properties": {
+        "layer": { "$ref": "#/$defs/Layer" },
+        "allowed_imports": {
+          "$ref": "#/$defs/ImportSource"
+        },
+        "forbidden": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicitly forbidden import patterns"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this rule exists"
+        }
+      }
+    },
+
+    "DependencyRules": {
+      "type": "array",
+      "description": "Complete dependency rule set. Validated by dependency-cruiser.",
+      "items": { "$ref": "#/$defs/DependencyRule" },
+      "x-constraint-target": "dependency-cruiser",
+      "contains": {
+        "properties": { "layer": { "const": "L1" }, "allowed_imports": { "const": "node-stdlib" } }
+      },
+      "x-invariants": [
+        "core: direct function calls within core are legal — core never goes through bus",
+        "modules: never import each other — all inter-module communication via bus.send()",
+        "modules: may import core (schema2object, errors) directly",
+        "extends: compose modules for specific scenarios — communicate via bus",
+        "adapters: receive core via injection — never import modules directly",
+        "main.mjs: reads config.json, calls boot(), routes to adapter — nothing hardwired"
+      ]
+    },
+
+    "BusEventName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*:[a-z][a-z0-9_]*$",
+      "description": "Bus event names follow namespace:action pattern",
+      "examples": [
+        "engine:process", "engine:reload",
+        "rules:list", "rules:get", "rules:create", "rules:update", "rules:delete", "rules:toggle", "rules:validate", "rules:test",
+        "admin:config", "admin:status", "admin:reload", "admin:restart", "admin:pause", "admin:resume", "admin:schema", "admin:logs", "admin:analytics"
+      ]
+    },
+
+    "EventDeclaration": {
+      "type": "object",
+      "description": "One event in a module's contract. Mirrors jster module.schema.json handles[]/listens[]/emits[] structure.",
+      "required": ["event"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "$ref": "#/$defs/BusEventName" },
+        "description": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "description": "JSON Schema Draft-07 shape of the payload. Used for ObjectTree construction and MCP tool generation."
+        }
+      }
+    },
+
+    "ModuleContract": {
+      "type": "object",
+      "description": "Module = one schema file + one code file. Schema declares identity and event contract. Code implements setup(bus, config) → teardown. Modules never import each other — bus only. Module may import core (schema2object, errors) directly.",
+      "required": ["name", "version", "path", "handles", "responsibility"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Module identity. Matches schema const."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semver. Declared as const in module schema."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^modules/[a-z]+/[a-z]+\\.mjs$",
+          "description": "Canonical path: modules/<name>/<name>.mjs"
+        },
+        "depends": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Module names that must load before this one. Boot toposorts automatically.",
+          "default": []
+        },
+        "handles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EventDeclaration" },
+          "description": "Events this module handles (one handler per event, registered via bus.handle)."
+        },
+        "listens": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EventDeclaration" },
+          "description": "Events this module observes (bus.on — fire-and-forget, no reply).",
+          "default": []
+        },
+        "emits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EventDeclaration" },
+          "description": "Events this module emits (bus.emit). Declared for documentation and wiring.",
+          "default": []
+        },
+        "responsibility": { "type": "string" },
+        "x-decision": { "type": "string", "description": "Why this module exists as a separate unit" }
+      }
+    },
+
+    "AdapterContract": {
+      "type": "object",
+      "description": "Adapters are pure I/O skins. One job: translate external protocol into core's language (core.handle / bus.send). They receive core via injection — never import L1 or L2 directly. main.mjs is the core; adapters are interchangeable shells.",
+      "required": ["name", "path", "transport", "injection", "responsibility"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "path": {
+          "type": "string",
+          "pattern": "^adapters/[a-z]+\\.mjs$"
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["stdin-stdout-hook", "stdio-jsonrpc", "http-sse", "argv-cli", "unix-socket-daemon"],
+          "description": "External protocol this adapter speaks"
+        },
+        "injection": {
+          "type": "string",
+          "enum": ["core", "handle-fn"],
+          "description": "How the adapter receives its execution context — never via direct import"
+        },
+        "responsibility": { "type": "string" },
+        "x-argv-scope": {
+          "type": "string",
+          "description": "For cli adapter only. Defines which argv commands this adapter owns.",
+          "enum": [
+            "all-argv",
+            "piped-stdin-only",
+            "jsonrpc-only",
+            "http-only",
+            "socket-only"
+          ]
+        }
+      }
+    },
+
+    "CommandPattern": {
+      "type": "object",
+      "description": "All external inputs are Commands. Each adapter translates its protocol into a Command and submits to core.handle(). This is the Command Pattern — the request itself is an object, decoupled from execution. Three entry points, one handler interface.",
+      "required": ["entry_points"],
+      "additionalProperties": false,
+      "properties": {
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["protocol", "adapter", "translation", "handle"],
+            "additionalProperties": false,
+            "properties": {
+              "protocol": { "type": "string" },
+              "adapter":  { "type": "string" },
+              "translation": { "type": "string", "description": "How external input becomes a Command" },
+              "handle": { "type": "string", "enum": ["core.handle(msg)", "bus.send(event)", "core.handleArgv(argv)"] }
+            }
+          },
+          "x-invariant": "Every adapter calls exactly one handle interface. No adapter calls two."
+        },
+        "x-gap": {
+          "type": "string",
+          "const": "argv not yet formally translated to Command — stop/status/reload live in main.mjs if/else. Needs refactor: ArgvAdapter → Command → core.handle().",
+          "description": "Current deviation from full Command Pattern compliance."
+        }
+      }
+    },
+
+    "CliAdapterScope": {
+      "type": "object",
+      "description": "cli adapter is the unified argv entry point. All external CLI interactions — daemon control, boot mode selection, and interactive tool invocation — go through cli adapter. main.mjs only decides: is this hook mode (piped stdin) or CLI mode?",
+      "required": ["daemon_commands", "boot_flags", "interactive_commands"],
+      "additionalProperties": false,
+      "properties": {
+        "daemon_commands": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["stop", "status", "reload", "restart"] },
+          "description": "Commands that talk to daemon process directly — no boot required."
+        },
+        "boot_flags": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["--daemon", "--sse", "--debug"] },
+          "description": "Flags that influence boot mode selection."
+        },
+        "interactive_commands": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Commands that boot core then invoke tools: 'cli <category> [action] [key=value...]'"
+        }
+      }
+    },
+
+    "ExtendContract": {
+      "type": "object",
+      "description": "Extends compose modules into specific application scenarios. An extend knows the business context. It may declare child modules. config.json lists root extends only — children self-declare in schema. Internal communication via object module + fn call. Only external boundary uses bus.",
+      "required": ["name", "path", "composes", "responsibility"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string", "pattern": "^extend/[a-z0-9-]+/[a-z0-9-]+\\.mjs$" },
+        "composes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Module names this extend depends on and composes together."
+        },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Child modules declared in this extend's schema. Loaded as part of this extend."
+        },
+        "internal_pattern": {
+          "type": "string",
+          "enum": ["object-module-fn", "bus"],
+          "default": "object-module-fn",
+          "description": "Internal communication pattern. object-module-fn = createX(config) → { methods }, direct fn calls between children. bus = children register on bus. Default is object-module-fn — bus only at external boundary."
+        },
+        "bus_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BusEventName" },
+          "description": "Bus events exposed at external boundary. Internal fn calls are invisible to bus."
+        },
+        "responsibility": { "type": "string" }
+      }
+    },
+
+    "HookMatchStrategy": {
+      "type": "string",
+      "enum": ["match", "match_bash"],
+      "description": "match = ObjectTree(event, schema) succeeds. match_bash = parse command nodes, ObjectTree(cmd, schema) any succeeds. No match field = always match."
+    },
+
+    "MergePolicy": {
+      "type": "object",
+      "description": "When multiple rules match the same event, merge by priority.",
+      "required": ["priority_order"],
+      "additionalProperties": false,
+      "properties": {
+        "priority_order": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["deny", "ask", "allow", "context"] },
+          "const": ["deny", "ask", "allow", "context"],
+          "description": "deny > ask > allow > context. All matched rules tagged in reason."
+        },
+        "reason_format": {
+          "type": "string",
+          "const": "[rulename:action] message",
+          "description": "Each matched rule contributes one tagged segment to the merged reason string"
+        }
+      }
+    },
+
+    "ProgressiveDisclosure": {
+      "type": "object",
+      "description": "L1/L2/L3 dispatch model. Do not merge all action params into L1. Show progressively.",
+      "required": ["L1", "L2", "L3"],
+      "additionalProperties": false,
+      "properties": {
+        "L1": {
+          "type": "string",
+          "const": "action enum + format only (additionalProperties: true)",
+          "description": "Tool list call. Return minimal schema — action enum and format only."
+        },
+        "L2": {
+          "type": "string",
+          "const": "args + example + inputSchema on validation error",
+          "description": "No action provided, or validation failed. Return full args with example."
+        },
+        "L3": {
+          "type": "string",
+          "const": "execute handler, format output",
+          "description": "Valid input received. Execute and return result."
+        }
+      }
+    },
+
+    "DataFlow": {
+      "type": "object",
+      "description": "Cross-module operations go through bus events. Within extends, children use fn calls.",
+      "required": ["name", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered sequence of bus events and transform steps"
+        }
+      }
+    },
+
+    "SchemaAnnotation": {
+      "type": "object",
+      "description": "x-* extensions used in schema files to carry architecture metadata.",
+      "required": ["annotation", "location", "purpose"],
+      "additionalProperties": false,
+      "properties": {
+        "annotation": {
+          "type": "string",
+          "enum": ["x-readonly", "x-internal", "x-match-patterns"]
+        },
+        "location": { "type": "string" },
+        "purpose": { "type": "string" }
+      }
+    },
+
+    "DesignDecision": {
+      "type": "object",
+      "description": "ADR-lite. Each decision records what was chosen and why.",
+      "required": ["decision", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "decision": { "type": "string" },
+        "rationale": { "type": "string" },
+        "x-supersedes": { "type": "string", "description": "What this decision replaced, if anything" }
+      }
+    },
+
+    "BootStrategy": {
+      "type": "object",
+      "description": "How main.mjs decides which runtime path to take. One entry point, multiple modes. Daemon-first: every mode attempts daemon socket before cold start. Module set loaded is determined by mode — not hardwired.",
+      "required": ["entry", "decision_tree", "daemon_first", "modes"],
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string",
+          "const": "main.mjs",
+          "description": "Only entry point. No other file is executed directly."
+        },
+        "decision_tree": {
+          "type": "array",
+          "description": "Ordered checks that determine the boot mode. First match wins.",
+          "items": {
+            "type": "object",
+            "required": ["condition", "mode"],
+            "additionalProperties": false,
+            "properties": {
+              "condition": { "type": "string", "description": "Boolean condition on argv + stdin state" },
+              "mode":      { "type": "string", "enum": ["hook", "daemon-control", "daemon", "mcp-stdio", "cli"] },
+              "action":    { "type": "string", "description": "What main.mjs does when this branch fires" }
+            }
+          },
+          "default": [
+            { "condition": "stdin is piped AND no --daemon AND command != cli", "mode": "hook",           "action": "daemon-proxy or cold-start engine; runHook(core); exit" },
+            { "condition": "command in [stop, status, reload, restart]",         "mode": "daemon-control", "action": "forward to daemon.mjs; exit; no boot" },
+            { "condition": "argv includes --daemon",                             "mode": "daemon",         "action": "fork child; child starts mcp-stdio + daemon socket" },
+            { "condition": "command == cli",                                     "mode": "cli",            "action": "daemon-proxy or cold-start; runCLI(core, cliArgs)" },
+            { "condition": "(default)",                                          "mode": "mcp-stdio",      "action": "daemon-proxy or cold-start; startStdio(core)" }
+          ]
+        },
+        "daemon_first": {
+          "type": "object",
+          "description": "Daemon-first rule: every mode that needs core first checks for a running daemon socket. If found, wrap as proxy core (no module loading). Only cold-start if no daemon.",
+          "required": ["check", "proxy_shape", "cold_start"],
+          "additionalProperties": false,
+          "properties": {
+            "check":       { "type": "string", "const": "connectDaemon(projectRoot) — returns proxy or null" },
+            "proxy_shape": { "type": "string", "const": "{ bus: { send }, handle } — minimal core shim over unix socket" },
+            "cold_start":  { "type": "string", "const": "boot({ isDaemon }) from mcp.mjs — loads full module set" }
+          }
+        },
+        "modes": {
+          "type": "array",
+          "description": "Each mode declares which module set it loads. Prevents accidental cross-loading.",
+          "items": {
+            "type": "object",
+            "required": ["mode", "modules_loaded", "adapters_started"],
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["hook", "daemon-control", "daemon", "mcp-stdio", "cli"]
+              },
+              "modules_loaded": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Module names loaded in this mode (empty = proxy, no local modules)."
+              },
+              "adapters_started": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Adapter names started in this mode."
+              },
+              "note": { "type": "string" }
+            }
+          },
+          "default": [
+            {
+              "mode": "hook",
+              "modules_loaded": ["engine", "rules"],
+              "adapters_started": ["hook"],
+              "note": "cold start only — daemon proxy skips module loading entirely"
+            },
+            {
+              "mode": "daemon-control",
+              "modules_loaded": [],
+              "adapters_started": ["daemon-client"],
+              "note": "no boot, no modules — only IPC to running daemon"
+            },
+            {
+              "mode": "daemon",
+              "modules_loaded": ["engine", "rules", "admin"],
+              "adapters_started": ["stdio", "daemon", "sse"],
+              "note": "full module set; daemon socket + stdio + optional sse"
+            },
+            {
+              "mode": "mcp-stdio",
+              "modules_loaded": ["engine", "rules", "admin"],
+              "adapters_started": ["stdio"],
+              "note": "full module set; managed by mcp-wrapper-rs — no daemon fork"
+            },
+            {
+              "mode": "cli",
+              "modules_loaded": ["engine", "rules", "admin"],
+              "adapters_started": ["cli"],
+              "note": "cold start only when no daemon; daemon proxy otherwise"
+            }
+          ]
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "required": [
+    "dependency_rules",
+    "core_components",
+    "modules",
+    "extends",
+    "adapters",
+    "features",
+    "bus_messages",
+    "merge_policy",
+    "progressive_disclosure",
+    "data_flows",
+    "schema_annotations",
+    "design_decisions"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "dependency_rules": {
+      "$ref": "#/$defs/DependencyRules"
+    },
+
+    "core_components": {
+      "type": "array",
+      "description": "Runtime infrastructure. Always present. Cannot unload. Direct function calls within core are legal. Provides: bus, schema2object, errors, log, module loader.",
+      "items": { "$ref": "#/$defs/CoreComponent" },
+      "minItems": 3
+    },
+
+    "extends": {
+      "type": "array",
+      "description": "Application compositions. Each extend assembles modules for a specific scenario (e.g. mcp-server, hook-engine). config.json lists root extends only.",
+      "items": { "$ref": "#/$defs/ExtendContract" },
+      "minItems": 1
+    },
+
+    "modules": {
+      "type": "array",
+      "description": "Business logic modules. Each registers handlers on bus via setup(bus, config).",
+      "items": { "$ref": "#/$defs/ModuleContract" },
+      "minItems": 3
+    },
+
+    "adapters": {
+      "type": "array",
+      "description": "Pure I/O adapters. Interchangeable transport skins.",
+      "items": { "$ref": "#/$defs/AdapterContract" },
+      "minItems": 5
+    },
+
+    "features": {
+      "type": "array",
+      "description": "Engine plugins. Invoked after rule match when rule.feature is set. Not bus handlers — direct function calls from engine.",
+      "items": { "$ref": "#/$defs/FeatureContract" },
+      "minItems": 1
+    },
+
+    "bus_messages": {
+      "type": "array",
+      "description": "All named bus messages with their semantic pattern (handle vs send) and correlation type.",
+      "items": { "$ref": "#/$defs/BusMessage" },
+      "minItems": 1
+    },
+
+    "command_pattern": {
+      "$ref": "#/$defs/CommandPattern",
+      "description": "Three entry points (argv/JSON-RPC/stdin), one handle interface. Command Pattern."
+    },
+
+    "cli_adapter_scope": {
+      "$ref": "#/$defs/CliAdapterScope",
+      "description": "Defines the boundary of cli adapter as the unified argv entry point."
+    },
+
+    "hook_match_strategies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/HookMatchStrategy" },
+      "description": "All valid rule match strategies"
+    },
+
+    "merge_policy": { "$ref": "#/$defs/MergePolicy" },
+
+    "progressive_disclosure": { "$ref": "#/$defs/ProgressiveDisclosure" },
+
+    "data_flows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/DataFlow" },
+      "description": "Named data flows through the system"
+    },
+
+    "schema_annotations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/SchemaAnnotation" }
+    },
+
+    "design_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/DesignDecision" },
+      "description": "Key architectural decisions with rationale. Equivalent to ADRs.",
+      "minItems": 10,
+      "x-decisions": [
+        "Single log file (logs/YYYY-MM-DD.log): foundation/log-file.mjs is shared primitive. main.mjs writes pre-bus; server/log.mjs writes post-bus. Same format, one file.",
+        "run/ for runtime state: hook-state.json, hook.pid, hook.sock, daemon.err all live in run/. logs/ is append-only log output only.",
+        "bash-compat name field: toCommand() must never assign name:undefined. Use conditional assignment — ObjectTree required check sees undefined key as present.",
+        "Daemon restart = fork new → SIGTERM old. NEVER process.exit() in daemon mode — that kills the daemon with no replacement. New daemon's startDaemon() cleans stale pidfile+socket automatically.",
+        "__HOOKS_DAEMON_CHILD env var: set by fork parent, preserved for entire daemon lifetime. admin:restart uses it to detect daemon mode. main.mjs no longer deletes it after fork guard.",
+        "Daemon stderr capture: fork with stdio ['ignore','pipe','pipe','ipc'], pipe stdout+stderr to run/daemon.err. Makes daemon crashes visible without console access.",
+        "Hooks encapsulation: hook.mjs is root extend. Internal children (rules, features, engine, handles) use object module + fn call — zero bus dependency. Only hooks:process-event exposed on bus. config.json mounts hook.schema.json as single leaf node.",
+        "Object module pattern: createX(config) → { methods }. Engine receives rules/features via dependency injection. Handlers receive features ref as parameter. No internal bus, no cross-import between children.",
+        "Handler ObjectTree-first: new ObjectTree({}, schema.responseSchema, loader) → operate properties → return ObjectTree. Engine calls .$toDict() at exit. Handlers never construct plain objects.",
+        "Observability: every object module and every non-trivial fn must emit bus.send('log', ...) at debug level. bus is infra — internal fn-call pattern does not prohibit bus log. Log prefix = module:fn (e.g. engine:match, handle:PreToolUse, match:validate, state:hasFired, merge:priority, feature:execute). hook.mjs passes bus to createEngine; engine passes log fn to handler payload; hook-match/state/merger/features receive bus or log fn at creation."
+      ]
+    },
+
+    "boot_strategy": {
+      "$ref": "#/$defs/BootStrategy",
+      "description": "Defines how main.mjs decides which runtime path to take. Single entry, multiple modes, daemon-first for all modes that need core."
+    }
+  },
+
+  "x-constraint-targets": {
+    "dependency_rules": "dependency-cruiser config (.dependency-cruiser.js)",
+    "l0_contract": "static analysis: lib/*.mjs must not import outside node stdlib",
+    "bus_events": "ESLint no-restricted-imports or custom lint rule",
+    "module_contract": "static analysis: every project/modules/*.mjs must export setup(bus)",
+    "adapter_contract": "static analysis: adapters/*.mjs must not import from foundation/ or server/",
+    "feature_contract": "static analysis: extend/hooks/features/*.mjs must not call bus.send() or bus.handle()"
+  },
+
+  "x-entry-points": {
+    "description": "main.mjs is the only entry point. Routes by argv and stdin state. Every mode that needs core applies daemon-first: try unix socket proxy, cold-start only if no daemon. Module set loaded is determined by mode — see boot_strategy.modes.",
+    "decision_summary": "hook (piped stdin) → daemon-proxy|cold-start → runHook → exit; daemon-control (stop/status/reload/restart) → IPC only, no boot; daemon (--daemon flag) → full boot + socket; cli (cli subcommand) → daemon-proxy|cold-start → runCLI; mcp-stdio (default) → daemon-proxy|cold-start → startStdio",
+    "modes": [
+      "main.mjs                         → mcp-stdio (default): daemon-proxy or cold-start",
+      "main.mjs --sse                   → mcp-stdio + HTTP+SSE",
+      "main.mjs --daemon                → daemon mode: fork + full boot",
+      "main.mjs stop                    → daemon-control: IPC, no boot",
+      "main.mjs status                  → daemon-control: IPC, no boot",
+      "main.mjs reload                  → daemon-control: IPC, no boot",
+      "main.mjs restart                 → daemon-control: stop + re-fork (CLI external)",
+      "admin:restart (daemon internal)   → fork new daemon + SIGTERM self (never process.exit)",
+      "main.mjs cli <category> [action] → cli mode: daemon-proxy or cold-start",
+      "echo event | main.mjs            → hook mode: daemon-proxy or cold-start → exit"
+    ]
+  },
+
+  "x-foundation": {
+    "runtime": "jster (oBus)",
+    "description": "This system is built on jster as the underlying runtime. jster provides: bus (dual-layer emit/send), module loader (toposort, hot-plug), schema2object (ObjectTree+Loader+KVO), core infrastructure. All development posture follows jster conventions.",
+    "reference": "~/projects/obus/jster/docs/",
+    "x-dev-posture": [
+      "Schema FIRST — write <name>.schema.json before <name>.mjs. Schema IS the contract.",
+      "config.json IS a Schema — not a data file. default values ARE runtime config. new ObjectTree({}, configSchema) extracts all defaults as live object.",
+      "Module = schema + code. One directory, two files: <name>.schema.json + <name>.mjs.",
+      "setup(bus, config) → teardown(). Every module exports setup, returns teardown.",
+      "handles/listens/emits declared in schema — these are the observable contract, not implementation details.",
+      "depends[] drives boot order — toposort is automatic, no manual ordering.",
+      "bus.send() replaces all direct function calls between modules — same sync semantics, adds observability.",
+      "bus.emit() for fire-and-forget notifications — observers see message lifecycle.",
+      "Core components (bus, schema2object) may be imported directly — they are infrastructure, not modules.",
+      "Adapters receive core via injection — never import modules or extends directly."
+    ]
+  },
+
+  "x-config-schema": {
+    "description": "config.json is a JSON Schema, not a data file. This is a jster core invariant.",
+    "pattern": "new ObjectTree({}, configSchema, loader) extracts all defaults as a live ObjectTree.",
+    "consequence": "Adding a new config value = add it to config.json schema with a default. Code reads it as config.property — no parsing, no env wrangling.",
+    "example": {
+      "config.json": "{ properties: { logLevel: { type: string, default: 'info' } } }",
+      "code": "config.logLevel  // 'info' — live ObjectTree getter, validated at construction"
+    }
+  },
+
+  "x-adapter-pattern": {
+    "description": "All adapters follow the same pattern: external protocol → core.handle(). main.mjs is core. Adapters are skins.",
+    "adapters": {
+      "cli":    "argv          → core.handle(tools/call)",
+      "stdio":  "JSON-RPC      → core.handle(tools/call)",
+      "hook":   "stdin JSON    → bus.send(hooks:process-event)",
+      "sse":    "HTTP+SSE      → core.handle(tools/call)",
+      "daemon": "Unix socket   → core.handle(tools/call)"
+    },
+    "x-decision": "cli adapter owns ALL argv parsing. stop/status/reload/restart are CLI commands, not main.mjs logic. main.mjs only distinguishes: hook mode (piped stdin) vs everything else (cli adapter)."
+  },
+
+  "x-core-invariants": [
+    "ONE process, ONE bus, ONE engine",
+    "main.mjs is the ONLY entry point — no other file is executed directly",
+    "Daemon-first: every mode that needs core tries daemon socket before cold-start",
+    "Module set is mode-specific — hook loads engine+rules only; mcp/daemon/cli load full set",
+    "Cross-module operations go through bus events. Within an extend, children use object module + fn call (no bus). Extends expose minimal bus surface at boundary.",
+    "Schema is the single source of truth",
+    "Rules ARE JSON Schema Draft-07 documents — matching = ObjectTree construction succeeds",
+    "HSO schema properties determine action→field mapping — zero hardcoded event names",
+    "Adapter receives core via injection — never via direct import",
+    "Hook fallback: daemon down → cold start engine in-process; exit immediately after response",
+    "Single log file: logs/YYYY-MM-DD.log — text format. foundation/log-file.mjs is the shared write primitive used by main.mjs (pre-bus) and server/log.mjs (post-bus). No JSONL, no separate audit file.",
+    "Runtime state in run/: hook-state.json, hook.pid, hook.sock, daemon.err. Not in logs/."
+  ]
+}

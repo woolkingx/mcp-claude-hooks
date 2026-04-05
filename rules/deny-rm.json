@@ -1,0 +1,24 @@
+{
+  "name": "deny-rm",
+  "description": "Block rm command",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "rm is disabled.\nUse instead:\n- mv file .cleanup/  (temp files)\n- mv file .backup/   (important files)",
+  "match_bash": {
+    "properties": {
+      "name": {
+        "properties": {
+          "text": {
+            "const": "rm"
+          }
+        }
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }
+}

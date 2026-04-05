@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bash-parse-result.schema.json",
+  "title": "BashParseResult",
+  "description": "Output of bash-parser.mjs (bashjsast compat layer). Commands are unbash-compatible Command nodes.",
+
+  "definitions": {
+
+    "WordText": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "Redirect": {
+      "type": "object",
+      "required": ["operator", "content"],
+      "properties": {
+        "operator": {
+          "type": "string",
+          "enum": [">","<",">>","<<","<<<","<<-","<&",">&","<>",">|","&>","&>>",">&-","<&-"]
+        },
+        "content": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "Command": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "Command" },
+        "name": { "$ref": "#/definitions/WordText" },
+        "prefix": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WordText" },
+          "default": []
+        },
+        "suffix": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WordText" },
+          "default": []
+        },
+        "redirects": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Redirect" },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "ParseResult": {
+      "type": "object",
+      "required": ["type", "commands", "raw"],
+      "properties": {
+        "type": { "enum": ["simple", "error"] },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Command" }
+        },
+        "raw": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+
+  },
+
+  "$ref": "#/definitions/ParseResult"
+}

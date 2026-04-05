@@ -1,0 +1,10 @@
+{
+  "name": "posttoolusefailure-log-error",
+  "description": "Log errors on tool failure",
+  "enabled": true,
+  "event": "PostToolUseFailure",
+  "priority": 50,
+  "tool": "Bash",
+  "action": "context",
+  "reason": "Tool failed — check error output, consider alternative approach before retrying"
+}

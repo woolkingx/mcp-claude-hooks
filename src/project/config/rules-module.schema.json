@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "rules-module.schema.json",
+  "title": "Rules Module",
+  "description": "Rule CRUD, validation, and test. All rule management goes through this module.",
+
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name":    { "type": "string", "const": "rules" },
+    "version": { "type": "string", "const": "0.1.0" },
+    "depends": { "type": "array", "default": [] },
+
+    "handles": {
+      "type": "array",
+      "default": [
+        { "event": "hooks_rules:list",     "description": "List all rules with status summary." },
+        { "event": "hooks_rules:get",      "description": "Get a single rule by name." },
+        { "event": "hooks_rules:create",   "description": "Create a new rule file." },
+        { "event": "hooks_rules:update",   "description": "Update an existing rule." },
+        { "event": "hooks_rules:delete",   "description": "Delete a rule file." },
+        { "event": "hooks_rules:toggle",   "description": "Enable/disable a rule (set enabled field)." },
+        { "event": "hooks_rules:validate", "description": "Validate a rule against rules.schema.json." },
+        { "event": "hooks_rules:test",     "description": "Test a rule against a sample event payload." }
+      ]
+    },
+
+    "listens": { "type": "array", "default": [] },
+
+    "emits": {
+      "type": "array",
+      "default": [
+        { "event": "rules:changed", "description": "Emitted after any create/update/delete/toggle. engine listens to trigger reload." }
+      ]
+    }
+  },
+
+  "definitions": {
+    "RuleRef": {
+      "type": "object",
+      "description": "Rule identity reference. Full rule shape defined in rules.schema.json.",
+      "required": ["name"],
+      "properties": {
+        "name":    { "type": "string" },
+        "enabled": { "oneOf": [{ "type": "boolean" }, { "const": "test" }] },
+        "event":   { "type": "string" },
+        "action":  { "type": "string" }
+      }
+    }
+  },
+
+  "x-tests": {
+    "crud":     ["create_writes_file", "update_merges_fields", "delete_removes_file", "toggle_flips_enabled"],
+    "validate": ["valid_rule_passes", "missing_required_fails", "invalid_action_fails"],
+    "test":     ["match_returns_matched", "no_match_returns_empty", "match_bash_parses_command"]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "rsync-delete-ask",
+  "description": "Ask for rsync --delete",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 70,
+  "tool": "Bash",
+  "action": "ask",
+  "reason": "rsync --delete will remove files at destination.\nConfirm?",
+  "match_bash": {
+    "allOf": [
+      {
+        "properties": {
+          "name": { "properties": { "text": { "const": "rsync" } } }
+        },
+        "required": ["name"]
+      },
+      {
+        "properties": {
+          "suffix": { "type": "array", "contains": { "properties": { "text": { "const": "--delete" } } } }
+        }
+      }
+    ]
+  }
+}

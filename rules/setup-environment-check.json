@@ -1,0 +1,9 @@
+{
+  "name": "setup-environment-check",
+  "description": "Setup environment check",
+  "enabled": true,
+  "event": "Setup",
+  "priority": 50,
+  "action": "context",
+  "reason": "Verify environment: Node.js, git, MCP servers available."
+}

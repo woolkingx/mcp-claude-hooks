@@ -1,0 +1,9 @@
+{
+  "name": "worktreecreate-init-context",
+  "description": "Init worktree context",
+  "enabled": true,
+  "event": "WorktreeCreate",
+  "priority": 50,
+  "action": "context",
+  "reason": "Worktree created — initialize branch context and load rules."
+}

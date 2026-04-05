@@ -1,0 +1,32 @@
+{
+  "name": "ask-git-all",
+  "description": "Ask for git write operations (exclude read-only)",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 65,
+  "tool": "Bash",
+  "action": "ask",
+  "reason": "確認執行 git 寫入操作？",
+  "match_bash": {
+    "allOf": [
+      {
+        "properties": {
+          "name": { "properties": { "text": { "const": "git" } } }
+        },
+        "required": ["name"]
+      },
+      {
+        "not": {
+          "properties": {
+            "suffix": {
+              "type": "array",
+              "contains": {
+                "properties": { "text": { "enum": ["status", "log", "diff", "show", "blame", "grep", "describe", "reflog", "fetch", "ls-files", "ls-remote", "ls-tree", "cat-file", "rev-parse", "shortlog", "for-each-ref"] } }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

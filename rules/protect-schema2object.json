@@ -1,0 +1,29 @@
+{
+  "name": "protect-schema2object",
+  "description": "Protect schema2object L0 core lib from accidental edits. Skip if cwd is schema2object project.",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 60,
+  "tool": ["Edit", "Write"],
+  "action": "ask",
+  "reason": "[protect] schema2object is L0 core lib. Editing from outside its project affects ALL dependents. Confirm intent.",
+  "match": {
+    "required": ["tool_input"],
+    "not": {
+      "properties": {
+        "cwd": { "type": "string", "pattern": "schema2object/master" }
+      },
+      "required": ["cwd"]
+    },
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "schema2object/master"
+          }
+        }
+      }
+    }
+  }
+}

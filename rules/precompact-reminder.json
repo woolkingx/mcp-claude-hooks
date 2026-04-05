@@ -1,0 +1,9 @@
+{
+  "name": "precompact-reminder",
+  "description": "Before compaction: run auto-learner then save state",
+  "enabled": true,
+  "event": "PreCompact",
+  "priority": 10,
+  "action": "context",
+  "reason": "Context compacting — REQUIRED: (1) Launch auto-learner agent (agents/auto-learner) with transcript_path and session_id to update skills/CLAUDE.md/arango. (2) Save important state to psm_data memo. Do both before compact proceeds."
+}

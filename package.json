@@ -1,0 +1,39 @@
+{
+  "name": "mcp-claude-hooks",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Schema-driven hook processor + MCP server for Claude Code. Draft-07 rule matching, 27 hook events, three-layer architecture.",
+  "main": "src/main.mjs",
+  "bin": {
+    "claude-hooks": "src/main.mjs",
+    "claude-hooks-cli": "src/cli.mjs",
+    "claude-hook": "src/main.mjs"
+  },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "start:sse": "node src/main.mjs --sse",
+    "start:daemon": "node src/main.mjs start --daemon",
+    "stop": "node src/main.mjs stop",
+    "status": "node src/main.mjs status",
+    "cli": "node src/cli.mjs",
+    "test": "node --test tests/test-bash-parser.mjs ; node --test tests/test-state.mjs ; node --test tests/test-schema-match.mjs ; node --test tests/test-schema-chain.mjs ; node --test tests/test-rules-valid.mjs ; node --test tests/test-template.mjs ; node --test tests/test-3layer.mjs ; node --test tests/test-rules.mjs ; node --test tests/test-handlers.mjs ; node --test tests/test-merger.mjs ; node --test tests/test-features.mjs ; node --test tests/test-engine.mjs ; node --test tests/test-hook.mjs ; node --test tests/test-s4-objectmodule.mjs ; node --test tests/test-adapters.mjs",
+    "test:unit": "node --test tests/test-bash-parser.mjs ; node --test tests/test-state.mjs ; node --test tests/test-schema-match.mjs ; node --test tests/test-schema-chain.mjs ; node --test tests/test-rules-valid.mjs ; node --test tests/test-template.mjs ; node --test tests/test-3layer.mjs ; node --test tests/test-rules.mjs ; node --test tests/test-handlers.mjs ; node --test tests/test-merger.mjs ; node --test tests/test-features.mjs ; node --test tests/test-engine.mjs ; node --test tests/test-s4-objectmodule.mjs",
+    "test:integration": "node --test tests/test-hook.mjs ; node --test tests/test-adapters.mjs ; node --test tests/test-daemon.mjs ; node --test tests/test-log.mjs",
+    "test:hook": "node --test tests/test-hook.mjs",
+    "test:match": "node --test tests/test-schema-match.mjs",
+    "test:schema": "node --test tests/test-schema-chain.mjs",
+    "test:rules": "node --test tests/test-rules-valid.mjs",
+    "test:engine": "node --test tests/test-engine.mjs",
+    "sync": "node scripts/sync-hooks-schema.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "hooks",
+    "schema-driven",
+    "json-schema",
+    "draft-07"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}

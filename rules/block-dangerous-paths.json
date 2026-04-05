@@ -1,0 +1,20 @@
+{
+  "name": "block-dangerous-paths",
+  "description": "Deny access to sensitive paths",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 95,
+  "tool": "Bash",
+  "action": "deny",
+  "reason": "Access to sensitive system paths is blocked.",
+  "match_bash": {
+    "properties": {
+      "suffix": {
+        "type": "array",
+        "contains": {
+          "properties": { "text": { "type": "string", "pattern": "(etc/shadow|etc/passwd)" } }
+        }
+      }
+    }
+  }
+}

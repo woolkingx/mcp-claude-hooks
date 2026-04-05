@@ -1,0 +1,9 @@
+{
+  "name": "subagent-load-claude-md",
+  "description": "Subagent start: SDD coding + schema-first + dedicated tools",
+  "enabled": true,
+  "event": "SubagentStart",
+  "priority": 50,
+  "action": "context",
+  "reason": "**[Subagent Rules]**\n\n**SDD Coding (.mjs only)**:\n- fn 在 setup 外定義, setup 只做接線\n- _ prefix 內部 fn\n- Schema-first: 沒有 schema 不寫 code\n- ObjectTree 是 object, 不是 dict factory\n- No log boilerplate\n- setup 返回 teardown function\n\n**Tools**: 用專用工具不用 Bash (Read not cat, Edit not sed, Glob not find, Grep not grep)\n**語言**: 對話中文, code 英文\n**Git**: 不 push master, 只從 release worktree push。不用 git checkout, 用 worktree。\n**品質**: fn < 50 行, 檔案 < 800 行, 巢狀 ≤ 4 層"
+}

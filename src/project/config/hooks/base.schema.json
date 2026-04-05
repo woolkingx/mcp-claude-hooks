@@ -1,0 +1,635 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hooks/base.schema.json",
+  "title": "Hook Shared Definitions",
+  "description": "Shared types for all hook event schemas. Generated — do not edit.",
+  "definitions": {
+    "BaseHookInput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "description": "Subagent identifier. Present only when the hook fires from within a subagent (e.g., a tool called by an AgentTool worker). Absent for the main thread, even in --agent sessions. Use this field (not agent_type) to distinguish subagent calls from main-thread calls.",
+          "type": "string"
+        },
+        "agent_type": {
+          "description": "Agent type name (e.g., \"general-purpose\", \"code-reviewer\"). Present when the hook fires from within a subagent (alongside agent_id), or on the main thread of a session started with --agent (without agent_id).",
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "permission_mode": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "transcript_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "transcript_path",
+        "cwd"
+      ],
+      "type": "object"
+    },
+    "CwdChangedHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "hookEventName": {
+          "type": "string",
+          "const": "CwdChanged"
+        },
+        "watchPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "ElicitationHookSpecificOutput": {
+      "additionalProperties": false,
+      "description": "Hook-specific output for the Elicitation event. Return this to programmatically accept or decline an MCP elicitation request.",
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "decline",
+            "cancel"
+          ],
+          "type": "string"
+        },
+        "content": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "Elicitation"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "ElicitationResultHookSpecificOutput": {
+      "additionalProperties": false,
+      "description": "Hook-specific output for the ElicitationResult event. Return this to override the action or content before the response is sent to the MCP server.",
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "decline",
+            "cancel"
+          ],
+          "type": "string"
+        },
+        "content": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "ElicitationResult"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "FileChangedHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "hookEventName": {
+          "type": "string",
+          "const": "FileChanged"
+        },
+        "watchPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "NotificationHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "Notification"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "PermissionBehavior": {
+      "enum": [
+        "allow",
+        "deny",
+        "ask"
+      ],
+      "type": "string"
+    },
+    "PermissionMode": {
+      "description": "Permission mode for controlling how tool executions are handled. 'default' - Standard behavior, prompts for dangerous operations. 'acceptEdits' - Auto-accept file edit operations. 'bypassPermissions' - Bypass all permission checks (requires allowDangerouslySkipPermissions). 'plan' - Planning mode, no actual tool execution. 'dontAsk' - Don't prompt for permissions, deny if not pre-approved.",
+      "enum": [
+        "default",
+        "acceptEdits",
+        "bypassPermissions",
+        "plan",
+        "dontAsk"
+      ],
+      "type": "string"
+    },
+    "PermissionRequestHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "behavior": {
+                  "const": "allow",
+                  "type": "string"
+                },
+                "updatedInput": {
+                  "additionalProperties": {},
+                  "type": "object"
+                },
+                "updatedPermissions": {
+                  "items": {
+                    "$ref": "#/definitions/PermissionUpdate"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "behavior"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "behavior": {
+                  "const": "deny",
+                  "type": "string"
+                },
+                "interrupt": {
+                  "type": "boolean"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "behavior"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "PermissionRequest"
+        }
+      },
+      "required": [
+        "hookEventName",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "PermissionRuleValue": {
+      "additionalProperties": false,
+      "properties": {
+        "ruleContent": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "toolName"
+      ],
+      "type": "object"
+    },
+    "PermissionUpdate": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "behavior": {
+              "$ref": "#/definitions/PermissionBehavior"
+            },
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "rules": {
+              "items": {
+                "$ref": "#/definitions/PermissionRuleValue"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "addRules",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rules",
+            "behavior",
+            "destination"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "behavior": {
+              "$ref": "#/definitions/PermissionBehavior"
+            },
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "rules": {
+              "items": {
+                "$ref": "#/definitions/PermissionRuleValue"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "replaceRules",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rules",
+            "behavior",
+            "destination"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "behavior": {
+              "$ref": "#/definitions/PermissionBehavior"
+            },
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "rules": {
+              "items": {
+                "$ref": "#/definitions/PermissionRuleValue"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "removeRules",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rules",
+            "behavior",
+            "destination"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "mode": {
+              "$ref": "#/definitions/PermissionMode"
+            },
+            "type": {
+              "const": "setMode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mode",
+            "destination"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "directories": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "addDirectories",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "directories",
+            "destination"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/PermissionUpdateDestination"
+            },
+            "directories": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "removeDirectories",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "directories",
+            "destination"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PermissionUpdateDestination": {
+      "enum": [
+        "userSettings",
+        "projectSettings",
+        "localSettings",
+        "session",
+        "cliArg"
+      ],
+      "type": "string"
+    },
+    "PostToolUseFailureHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "PostToolUseFailure"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "PostToolUseHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "PostToolUse"
+        },
+        "updatedMCPToolOutput": {}
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "PreToolUseHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "PreToolUse"
+        },
+        "permissionDecision": {
+          "$ref": "#/definitions/PermissionBehavior"
+        },
+        "permissionDecisionReason": {
+          "type": "string"
+        },
+        "updatedInput": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "SessionStartHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "SessionStart"
+        },
+        "initialUserMessage": {
+          "type": "string"
+        },
+        "watchPaths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "SetupHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "Setup"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "SubagentStartHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "SubagentStart"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "SyncHookJSONOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "block"
+          ],
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PreToolUseHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/UserPromptSubmitHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/SessionStartHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/SetupHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/SubagentStartHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/PostToolUseHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/PostToolUseFailureHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/NotificationHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/PermissionRequestHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/ElicitationHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/ElicitationResultHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/CwdChangedHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/FileChangedHookSpecificOutput"
+            },
+            {
+              "$ref": "#/definitions/WorktreeCreateHookSpecificOutput"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UserPromptSubmitHookSpecificOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalContext": {
+          "type": "string"
+        },
+        "hookEventName": {
+          "type": "string",
+          "const": "UserPromptSubmit"
+        }
+      },
+      "required": [
+        "hookEventName"
+      ],
+      "type": "object"
+    },
+    "WorktreeCreateHookSpecificOutput": {
+      "additionalProperties": false,
+      "description": "Hook-specific output for the WorktreeCreate event. Provides the absolute path to the created worktree directory. Command hooks print the path on stdout instead.",
+      "properties": {
+        "hookEventName": {
+          "type": "string",
+          "const": "WorktreeCreate"
+        },
+        "worktreePath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "hookEventName",
+        "worktreePath"
+      ],
+      "type": "object"
+    }
+  },
+  "x-generated": {
+    "timestamp": "2026-03-28T20:40:43.745Z",
+    "sdk_version": "0.2.86",
+    "source": "sync-hooks-schema.mjs"
+  }
+}

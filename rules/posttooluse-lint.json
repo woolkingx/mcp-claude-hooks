@@ -1,0 +1,22 @@
+{
+  "name": "posttooluse-lint",
+  "description": "Lint after editing code files",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 50,
+  "tool": ["Edit", "Write"],
+  "action": "context",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "(\\.py$|\\.ts$|\\.tsx$|\\.js$|\\.mjs$|\\.cjs$|\\.rs$|\\.go$|\\.sh$|\\.json$)",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "feature": "lint"
+}

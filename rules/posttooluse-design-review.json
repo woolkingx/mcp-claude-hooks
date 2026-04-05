@@ -1,0 +1,34 @@
+{
+  "name": "posttooluse-design-review",
+  "description": "Code review agent: after editing .mjs or .schema.json, checks against design rules, architecture docs, and CLAUDE.md",
+  "enabled": false,
+  "event": "PostToolUse",
+  "priority": 60,
+  "tool": [
+    "Edit",
+    "Write"
+  ],
+  "action": "context",
+  "reason": "Design review: checking edited file against design rules and architecture.",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "(\\.mjs$|\\.schema\\.json$)"
+          }
+        }
+      }
+    }
+  },
+  "feature": "agent",
+  "agent": {
+    "model": "haiku",
+    "tools": [
+      "Read",
+      "Glob"
+    ],
+    "prompt": "You are a code review agent. A file was just edited. Review it against the project's design rules, architecture, and CLAUDE.md.\n\n## Input\n\nYou receive:\n- `tool_input.file_path`: the file that was just edited\n- `tool_output`: the edit result\n\n## Workflow\n\n1. READ the edited file.\n\n2. FIND and READ the nearest CLAUDE.md (walk up from file_path until found).\n\n3. If the file is inside an oBus/jster project, also read:\n   - `docs/architecture.md` (if exists near project root)\n   - For `.mjs` files: the sibling `.schema.json` (same basename)\n   - For `.schema.json` files: the sibling `.mjs`\n\n4. REVIEW against these rules:\n\n   **Schema rules** (for .schema.json):\n   - `$schema` and `$id` present\n   - `name`, `version`, `module` are `const` strings\n   - `handles`, `listens`, `emits` declared\n   - `$ref` uses relative file path (not $id) for external schemas\n   - No `additionalProperties: false` on Options/payload schemas\n\n   **Module rules** (for .mjs):\n   - `setup(bus, config)` signature, returns teardown\n   - Teardown calls `removeHandler` for every `bus.handle()` registered\n   - Config accessed as `config.field` — no destructuring\n   - No `console.log` — log via `bus.emit('log', ...)`\n   - No direct cross-module imports — all I/O via bus\n   - ObjectTree built once, used directly — not converted to dict mid-logic\n\n   **Design rules** (both):\n   - Schema before code — if .mjs changed, does .schema.json reflect it?\n   - Bus = postman — handler must not inspect/transform the bus envelope\n   - One handler per event — no duplicate `bus.handle()` for same event\n   - Child module name = `<parent>.<child>` pattern\n\n5. OUTPUT only if issues found:\n\n```\n[design-review] <filename>\n- ISSUE: <specific violation> — <line or evidence>\n- ISSUE: <specific violation>\n```\n\nIf no issues: output nothing (empty string). Do NOT explain what looks good."
+  }
+}

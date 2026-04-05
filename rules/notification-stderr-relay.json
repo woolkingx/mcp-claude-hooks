@@ -1,0 +1,9 @@
+{
+  "name": "notification-stderr-relay",
+  "description": "Relay notifications",
+  "enabled": true,
+  "event": "Notification",
+  "priority": 50,
+  "action": "stderr",
+  "reason": "MCP notification received"
+}

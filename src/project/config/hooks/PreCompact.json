@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hooks/PreCompact.json",
+  "title": "PreCompact Hook API",
+  "definitions": {
+    "event": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "description": "Subagent identifier. Present only when the hook fires from within a subagent (e.g., a tool called by an AgentTool worker). Absent for the main thread, even in --agent sessions. Use this field (not agent_type) to distinguish subagent calls from main-thread calls.",
+          "type": "string"
+        },
+        "agent_type": {
+          "description": "Agent type name (e.g., \"general-purpose\", \"code-reviewer\"). Present when the hook fires from within a subagent (alongside agent_id), or on the main thread of a session started with --agent (without agent_id).",
+          "type": "string"
+        },
+        "custom_instructions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "hook_event_name": {
+          "type": "string",
+          "const": "PreCompact"
+        },
+        "permission_mode": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "transcript_path": {
+          "type": "string"
+        },
+        "trigger": {
+          "enum": [
+            "manual",
+            "auto"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "hook_event_name",
+        "custom_instructions",
+        "cwd",
+        "session_id",
+        "transcript_path",
+        "trigger"
+      ],
+      "type": "object",
+      "title": "PreCompact Input"
+    },
+    "response": {
+      "type": "object",
+      "title": "PreCompact Response",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "block"
+          ],
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "anyOf": [
+            {
+              "$ref": "hooks/base.schema.json#/definitions/CwdChangedHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/ElicitationHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/ElicitationResultHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/FileChangedHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/NotificationHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/PermissionRequestHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/PostToolUseFailureHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/PostToolUseHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/PreToolUseHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/SessionStartHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/SetupHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/SubagentStartHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/UserPromptSubmitHookSpecificOutput"
+            },
+            {
+              "$ref": "hooks/base.schema.json#/definitions/WorktreeCreateHookSpecificOutput"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/definitions/event"
+    },
+    {
+      "$ref": "#/definitions/response"
+    }
+  ],
+  "x-generated": {
+    "timestamp": "2026-03-28T20:40:43.745Z",
+    "sdk_version": "0.2.86",
+    "source": "sync-hooks-schema.mjs"
+  }
+}

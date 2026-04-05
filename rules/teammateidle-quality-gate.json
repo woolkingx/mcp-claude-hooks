@@ -1,0 +1,9 @@
+{
+  "name": "teammateidle-quality-gate",
+  "description": "Quality gate on idle",
+  "enabled": true,
+  "event": "TeammateIdle",
+  "priority": 50,
+  "action": "context",
+  "reason": "Teammate idle — run quality checks before proceeding."
+}

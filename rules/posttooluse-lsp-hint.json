@@ -1,0 +1,26 @@
+{
+  "name": "posttooluse-lsp-hint",
+  "description": "Hint LSP availability after writing/editing JS/TS files",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 60,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "context",
+  "reason": "LSP available for this file. Use LSP tool to get precise code intelligence:\n- documentSymbol: list all functions/classes/variables\n- goToDefinition: jump to where a symbol is defined\n- findReferences: find all usages of a symbol\n- hover: get type signature and docs\n- incomingCalls/outgoingCalls: trace call graph",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "\\.(js|jsx|ts|tsx|mjs|cjs|mts|cts)$",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "repeat": false
+}

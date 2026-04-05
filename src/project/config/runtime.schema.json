@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Runtime",
+  "description": "System runtime configuration. Every core module reads defaults from here.",
+
+  "definitions": {
+
+    "ProtocolVersion": {
+      "type": "string",
+      "description": "MCP protocol version this server supports.",
+      "const": "2025-03-26",
+      "default": "2025-03-26"
+    },
+
+    "ErrorCode": {
+      "type": "object",
+      "description": "JSON-RPC 2.0 standard error codes + MCP extensions.",
+      "properties": {
+        "PARSE_ERROR":      { "type": "integer", "const": -32700, "default": -32700 },
+        "INVALID_REQUEST":  { "type": "integer", "const": -32600, "default": -32600 },
+        "METHOD_NOT_FOUND": { "type": "integer", "const": -32601, "default": -32601 },
+        "INVALID_PARAMS":   { "type": "integer", "const": -32602, "default": -32602 },
+        "INTERNAL_ERROR":   { "type": "integer", "const": -32603, "default": -32603 }
+      },
+      "additionalProperties": false,
+      "default": {
+        "PARSE_ERROR": -32700, "INVALID_REQUEST": -32600,
+        "METHOD_NOT_FOUND": -32601, "INVALID_PARAMS": -32602,
+        "INTERNAL_ERROR": -32603
+      }
+    },
+
+    "ServerInfo": {
+      "type": "object",
+      "description": "Maps to MCP Implementation (name + version). Edit defaults for your server.",
+      "properties": {
+        "name":    { "type": "string", "default": "mcp-claude-hooks" },
+        "version": { "type": "string", "default": "0.1.0" }
+      },
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "default": { "name": "mcp-claude-hooks", "version": "0.1.0" }
+    },
+
+    "LogLevel": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warn", "error", "fatal"],
+      "default": "info",
+      "description": "Six-level severity: trace(0) debug(1) info(2) warn(3) error(4) fatal(5)"
+    },
+
+    "ConsoleConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":    { "type": "boolean", "default": false, "description": "Write to stderr (disabled by default — all log to file)" },
+        "level":      { "$ref": "#/definitions/LogLevel", "default": "info" },
+        "color":      { "type": "boolean", "default": true, "description": "ANSI colors (auto-disabled if not TTY)" },
+        "timestamps": { "type": "boolean", "default": true }
+      },
+      "default": {}
+    },
+
+    "LogConfig": {
+      "type": "object",
+      "properties": {
+        "level":              { "$ref": "#/definitions/LogLevel" },
+        "logDir":             { "type": ["string", "null"], "default": "logs/", "description": "Directory for daily log files (YYYY-MM-DD.log). null = disable file logging." },
+        "console":            { "$ref": "#/definitions/ConsoleConfig", "default": {} },
+        "payloadMaxBytes":    { "type": "integer", "default": 4096, "description": "Max bytes for payload snapshot in debug/trace entries" },
+        "logPurgeMs":         { "type": "integer", "minimum": 1000, "default": 300000, "description": "Purge stale request logs after this many ms" },
+        "maxTrackedRequests": { "type": "integer", "minimum": 10, "default": 100 },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "maxDays":  { "type": "integer", "minimum": 1, "default": 7, "description": "Delete daily log files older than this many days" }
+          },
+          "additionalProperties": false,
+          "default": { "maxDays": 7 }
+        }
+      },
+      "additionalProperties": false,
+      "default": { "level": "debug", "logDir": "logs/", "console": {}, "payloadMaxBytes": 4096, "logPurgeMs": 300000, "maxTrackedRequests": 100, "retention": { "maxDays": 7 } }
+    },
+
+    "OutputConfig": {
+      "type": "object",
+      "properties": {
+        "format":            { "$ref": "config.json#/definitions/OutputFormat" },
+        "tableMaxColumns":   { "type": "integer", "minimum": 1, "default": 6 },
+        "tableMaxCellLength": { "type": "integer", "minimum": 10, "default": 120 },
+        "fileDir":           { "type": "string", "default": "./output", "description": "Directory for file output mode" },
+        "fileNamePattern":   { "type": "string", "default": "{category}_{action}_{ts}", "description": "File naming: {category}, {action}, {ts}, {id}" },
+        "fileFormat":        { "type": "string", "enum": ["json", "md"], "default": "json", "description": "File content format when output mode is file" }
+      },
+      "additionalProperties": false,
+      "default": { "format": "md", "tableMaxColumns": 6, "tableMaxCellLength": 120, "fileDir": "./output", "fileNamePattern": "{category}_{action}_{ts}", "fileFormat": "json" }
+    },
+
+    "ProcessConfig": {
+      "type": "object",
+      "description": "Daemon process management. Used by main.mjs start --daemon.",
+      "properties": {
+        "mode":    { "type": "string", "enum": ["foreground", "daemon"], "default": "foreground", "description": "foreground = stdio/sse, daemon = fork + detach + socket" },
+        "pidFile": { "type": "string", "default": "run/hook.pid", "description": "PID file path (relative to project root)" },
+        "socketPath": { "type": "string", "default": "run/hook.sock", "description": "Unix socket path (relative to project root)" },
+        "logFile": { "type": "string", "default": "logs/daemon.log", "description": "Daemon stderr log file" }
+      },
+      "additionalProperties": false,
+      "default": { "mode": "foreground", "pidFile": "run/hook.pid", "socketPath": "run/hook.sock", "logFile": "logs/daemon.log" }
+    },
+
+    "CoreShape": {
+      "type": "object",
+      "description": "Runtime core object — returned by boot(), consumed by all adapters. Proxy and cold-start must both satisfy this shape.",
+      "required": ["handle", "bus", "errorCodes", "lifecycle"],
+      "properties": {
+        "handle":     { "description": "async (jsonrpc) => jsonrpc response" },
+        "bus":        { "type": "object", "description": "Message bus with send(event, payload) and has(event)", "required": ["send", "has"] },
+        "errorCodes": { "$ref": "#/definitions/ErrorCode" },
+        "lifecycle":  { "type": "object", "description": "Lifecycle controller", "required": ["ready", "stop", "shutdown", "getState"] },
+        "runtime":    { "description": "ObjectTree runtime config (null in proxy mode)" },
+        "transport":  { "description": "MCP transport config (null in proxy mode)" },
+        "engine":     { "description": "Engine instance (null in proxy mode)" }
+      },
+      "additionalProperties": false
+    },
+
+    "LifecycleConfig": {
+      "type": "object",
+      "properties": {
+        "signals":       { "type": "array", "items": { "type": "string" }, "default": ["SIGINT", "SIGTERM"], "description": "OS signals that trigger graceful shutdown" },
+        "drainMs":       { "type": "integer", "minimum": 0, "default": 5000, "description": "Max ms to wait for in-flight requests before force exit" },
+        "exitCode":      { "type": "integer", "default": 0, "description": "Process exit code on clean shutdown" },
+        "exitOnUncaught": { "type": "boolean", "default": true, "description": "Exit on uncaught exception after logging" }
+      },
+      "additionalProperties": false,
+      "default": { "signals": ["SIGINT", "SIGTERM"], "drainMs": 5000, "exitCode": 0, "exitOnUncaught": true }
+    }
+  },
+
+  "type": "object",
+  "properties": {
+    "protocolVersion": { "$ref": "#/definitions/ProtocolVersion", "x-internal": true },
+    "errorCodes":      { "$ref": "#/definitions/ErrorCode", "x-internal": true },
+    "server":          { "$ref": "#/definitions/ServerInfo" },
+    "log":             { "$ref": "#/definitions/LogConfig" },
+    "transport":       { "$ref": "transport.schema.json", "x-readonly": true },
+    "output":          { "$ref": "#/definitions/OutputConfig" },
+    "lifecycle":       { "$ref": "#/definitions/LifecycleConfig" },
+    "process":         { "$ref": "#/definitions/ProcessConfig", "x-readonly": true }
+  },
+  "additionalProperties": false,
+  "default": {}
+}

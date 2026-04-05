@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features/lint/lint.schema.json",
+  "title": "Lint Feature",
+  "description": "Syntax check after Edit/Write. No config required.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false,
+  "x-docs": {
+    "intent": "Run language-specific linter on the edited file. Returns error string or null.",
+    "category": "feature",
+    "notes": "Supports: .py .js .mjs .cjs .ts .tsx .rs .go .c .cpp .sh .rb .php .json"
+  }
+}

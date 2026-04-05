@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hooks/ElicitationResult.json",
+  "title": "ElicitationResult Hook API",
+  "definitions": {
+    "event": {
+      "additionalProperties": false,
+      "description": "Hook input for the ElicitationResult event. Fired after the user responds to an MCP elicitation. Hooks can observe or override the response before it is sent to the server.",
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "decline",
+            "cancel"
+          ],
+          "type": "string"
+        },
+        "agent_id": {
+          "description": "Subagent identifier. Present only when the hook fires from within a subagent (e.g., a tool called by an AgentTool worker). Absent for the main thread, even in --agent sessions. Use this field (not agent_type) to distinguish subagent calls from main-thread calls.",
+          "type": "string"
+        },
+        "agent_type": {
+          "description": "Agent type name (e.g., \"general-purpose\", \"code-reviewer\"). Present when the hook fires from within a subagent (alongside agent_id), or on the main thread of a session started with --agent (without agent_id).",
+          "type": "string"
+        },
+        "content": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "elicitation_id": {
+          "type": "string"
+        },
+        "hook_event_name": {
+          "type": "string",
+          "const": "ElicitationResult"
+        },
+        "mcp_server_name": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "form",
+            "url"
+          ],
+          "type": "string"
+        },
+        "permission_mode": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "transcript_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "hook_event_name",
+        "action",
+        "cwd",
+        "mcp_server_name",
+        "session_id",
+        "transcript_path"
+      ],
+      "type": "object",
+      "title": "ElicitationResult Input"
+    },
+    "response": {
+      "type": "object",
+      "title": "ElicitationResult Response",
+      "additionalProperties": false,
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "block"
+          ],
+          "type": "string"
+        },
+        "hookSpecificOutput": {
+          "$ref": "hooks/base.schema.json#/definitions/ElicitationResultHookSpecificOutput"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stopReason": {
+          "type": "string"
+        },
+        "suppressOutput": {
+          "type": "boolean"
+        },
+        "systemMessage": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/definitions/event"
+    },
+    {
+      "$ref": "#/definitions/response"
+    }
+  ],
+  "x-generated": {
+    "timestamp": "2026-03-28T20:40:43.745Z",
+    "sdk_version": "0.2.86",
+    "source": "sync-hooks-schema.mjs"
+  }
+}

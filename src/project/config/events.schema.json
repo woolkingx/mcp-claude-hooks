@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "events.schema.json",
+  "title": "Hook Events",
+  "description": "Hook event schema registry — root node for all 26 hook event types. Provides input/response schemas for each event handler.",
+
+  "definitions": {
+    "base": { "$ref": "hooks/base.schema.json" }
+  },
+
+  "type": "object",
+  "properties": {
+    "ConfigChange":       { "$ref": "hooks/ConfigChange.json" },
+    "CwdChanged":         { "$ref": "hooks/CwdChanged.json" },
+    "Elicitation":        { "$ref": "hooks/Elicitation.json" },
+    "ElicitationResult":  { "$ref": "hooks/ElicitationResult.json" },
+    "FileChanged":        { "$ref": "hooks/FileChanged.json" },
+    "InstructionsLoaded": { "$ref": "hooks/InstructionsLoaded.json" },
+    "Notification":       { "$ref": "hooks/Notification.json" },
+    "PermissionRequest":  { "$ref": "hooks/PermissionRequest.json" },
+    "PostCompact":        { "$ref": "hooks/PostCompact.json" },
+    "PostToolUse":        { "$ref": "hooks/PostToolUse.json" },
+    "PostToolUseFailure": { "$ref": "hooks/PostToolUseFailure.json" },
+    "PreCompact":         { "$ref": "hooks/PreCompact.json" },
+    "PreToolUse":         { "$ref": "hooks/PreToolUse.json" },
+    "SessionEnd":         { "$ref": "hooks/SessionEnd.json" },
+    "SessionStart":       { "$ref": "hooks/SessionStart.json" },
+    "Setup":              { "$ref": "hooks/Setup.json" },
+    "Stop":               { "$ref": "hooks/Stop.json" },
+    "StopFailure":        { "$ref": "hooks/StopFailure.json" },
+    "SubagentStart":      { "$ref": "hooks/SubagentStart.json" },
+    "SubagentStop":       { "$ref": "hooks/SubagentStop.json" },
+    "TaskCompleted":      { "$ref": "hooks/TaskCompleted.json" },
+    "TaskCreated":        { "$ref": "hooks/TaskCreated.json" },
+    "TeammateIdle":       { "$ref": "hooks/TeammateIdle.json" },
+    "UserPromptSubmit":   { "$ref": "hooks/UserPromptSubmit.json" },
+    "WorktreeCreate":     { "$ref": "hooks/WorktreeCreate.json" },
+    "WorktreeRemove":     { "$ref": "hooks/WorktreeRemove.json" }
+  },
+  "additionalProperties": false,
+
+  "x-methods": {
+    "getEvent": {
+      "properties": {
+        "eventName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["eventName"]
+    },
+    "hasEvent": {
+      "properties": {
+        "eventName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["eventName"]
+    },
+    "listEvents": {
+      "type": "object"
+    }
+  },
+
+  "x-tests": {
+    "getEvent":   ["valid_normal", "missing", "invalid_format"],
+    "hasEvent":   ["valid_normal", "missing"],
+    "listEvents": ["valid_normal"]
+  },
+
+  "x-docs": {
+    "intent":   "Single $ref root for all hook event schemas. Child of hook.schema.json. Provides input/response schema for all 26 event types.",
+    "category": "config",
+    "notes":    "base.schema.json provides shared HSO definitions (PreToolUseHookSpecificOutput, etc.). Each event property $refs the full event API schema."
+  }
+}

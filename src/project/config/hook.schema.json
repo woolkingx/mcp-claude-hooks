@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hook.schema.json",
+  "title": "Hooks System",
+  "description": "Root hooks module. Encapsulates rules, features, and event schemas. Declarations for child modules: rules, engine, features.",
+
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "const": "hooks",
+      "description": "Root module name"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "rules": {
+      "$ref": "../../extend/hooks/rules/rules.schema.json",
+      "description": "Rule index (O(1) lookup by rule name)"
+    },
+    "features": {
+      "$ref": "../../extend/hooks/features/features.schema.json",
+      "description": "Feature registry — config for lint, doc-size-checker, agent"
+    },
+    "engine": {
+      "$ref": "../../extend/hooks/engine/engine.schema.json",
+      "description": "Hooks engine — orchestrates rule matching and feature execution"
+    },
+    "state": {
+      "$ref": "../../extend/hooks/engine/state.schema.json",
+      "description": "Dedup state manager — tracks rule firing per session"
+    },
+    "events": {
+      "$ref": "events.schema.json",
+      "description": "Hook event schema registry — 26 event types"
+    }
+  },
+  "required": ["name", "version"],
+  "additionalProperties": false,
+
+  "x-children": [
+    {
+      "name": "hooks.rules",
+      "path": "../../extend/hooks/rules"
+    },
+    {
+      "name": "hooks.features",
+      "path": "../../extend/hooks/features"
+    },
+    {
+      "name": "hooks.engine",
+      "path": "../../extend/hooks/engine"
+    }
+  ],
+
+  "x-docs": {
+    "intent": "Root hooks module encapsulation. Single config.json leaf node. Declares child modules (rules/features/engine). Internal module communication via fn call, not bus.",
+    "category": "config"
+  }
+}

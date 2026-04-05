@@ -1,0 +1,31 @@
+{
+  "name": "posttooluse-doc-size-checker",
+  "description": "Warn when documentation files exceed word count thresholds (token cost awareness)",
+  "enabled": true,
+  "event": "PostToolUse",
+  "priority": 60,
+  "tool": [
+    "Edit",
+    "Write"
+  ],
+  "action": "context",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "(CLAUDE|AGENTS|GEMINI|claude|agents|gemini)\\.md$"
+          }
+        }
+      }
+    }
+  },
+  "feature": {
+    "name": "doc-size-checker",
+    "config": {
+      "warn": 300,
+      "error": 500
+    }
+  }
+}

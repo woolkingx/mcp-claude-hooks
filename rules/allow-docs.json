@@ -1,0 +1,21 @@
+{
+  "name": "allow-docs",
+  "description": "Auto-allow reading docs",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 10,
+  "tool": "Read",
+  "action": "allow",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "pattern": "(/docs/|/README|\\.md$)"
+          }
+        }
+      }
+    }
+  }
+}

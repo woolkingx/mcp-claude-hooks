@@ -1,0 +1,9 @@
+{
+  "name": "subagentstop-context-summary",
+  "description": "Summarize subagent context",
+  "enabled": true,
+  "event": "SubagentStop",
+  "priority": 50,
+  "action": "context",
+  "reason": "Subagent completed — summarize findings for main thread."
+}
