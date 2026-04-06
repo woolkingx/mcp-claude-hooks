@@ -170,10 +170,11 @@ node src/main.mjs cli hooks_admin reload
 ```bash
 node src/main.mjs start --daemon   # start
 node src/main.mjs status           # check
+node src/main.mjs restart          # zero-downtime restart (new daemon ready before old stops)
 node src/main.mjs stop             # stop
 ```
 
-Auto-detected by the hook command. No config change needed.
+Auto-detected by the hook command. No config change needed. Restart uses a detached helper process — the new daemon is fully listening before the old one receives SIGTERM.
 
 ## Supported Events
 
@@ -204,13 +205,13 @@ All 27 Claude Code hook events are supported:
 ## Testing
 
 ```bash
-# All tests (17 suites, 266 tests)
+# All tests (18 suites, 282 tests)
 npm test
 
 # Unit tests only
 npm run test:unit
 
-# Integration tests (requires daemon)
+# Integration tests (daemon lifecycle, restart, log rotation)
 npm run test:integration
 
 # Individual suite

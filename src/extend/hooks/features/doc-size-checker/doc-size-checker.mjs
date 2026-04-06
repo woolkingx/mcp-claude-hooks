@@ -1,14 +1,16 @@
-// doc-size-checker/doc-size-checker.mjs — Word count check for documentation files
-// Returns additionalContext warning or null.
+// doc-size-checker/doc-size-checker.mjs — Size check for documentation files
+// Three levels: best (info), warn, error. Unit: "lines" or "chars".
+// Claude Code MAX_MEMORY_CHARACTER_COUNT = 40000 per file (claudemd.ts:92)
 
 import { readFileSync, existsSync } from 'node:fs'
 
 export const name = 'doc-size-checker'
 
-const DEFAULTS = { warn: 300, error: 500 }
+const DEFAULTS = { best: 200, warn: 300, error: 500, unit: 'lines' }
 
-function _wordCount(text) {
-  return text.trim().split(/\s+/).filter(Boolean).length
+function _measure(content, unit) {
+  if (unit === 'chars') return content.length
+  return content.split('\n').length
 }
 
 function _readFile(filePath) {
@@ -18,19 +20,29 @@ function _readFile(filePath) {
 }
 
 function _buildMessage(filePath, count, cfg) {
+  const best  = cfg.best  ?? DEFAULTS.best
   const warn  = cfg.warn  ?? DEFAULTS.warn
   const error = cfg.error ?? DEFAULTS.error
-  if (count < warn) return null
+  const unit  = cfg.unit  ?? DEFAULTS.unit
+  if (count <= best) return null
 
   const fileName = filePath.split('/').pop()
-  const isError  = count >= error
-  const level    = isError ? 'ERROR' : 'WARN'
-  const label    = isError
-    ? `**[doc-size ${level}]** \`${fileName}\` is ${count} words — exceeds ${error} word limit.`
-    : `**[doc-size ${level}]** \`${fileName}\` is ${count} words — approaching ${error} word limit (warn at ${warn}).`
-  const tip = isError
-    ? '\nToken cost: every word in this file is sent with every request. Discuss trimming with the user before saving.'
-    : '\nConsider trimming: remove explanatory text, keep only rules with ✅/❌ examples.'
+  const display  = unit === 'chars' ? `${(count / 1000).toFixed(1)}k chars` : `${count} lines`
+
+  let level, label, tip
+  if (count >= error) {
+    level = 'ERROR'
+    label = `**[doc-size ${level}]** \`${fileName}\` is ${display} — exceeds ${error} ${unit} limit.`
+    tip   = '\nEvery line in this file is sent with every request. Trim or split before saving.'
+  } else if (count >= warn) {
+    level = 'WARN'
+    label = `**[doc-size ${level}]** \`${fileName}\` is ${display} — approaching ${error} ${unit} limit (warn at ${warn}).`
+    tip   = '\nConsider trimming: remove explanatory text, keep only rules with concrete examples.'
+  } else {
+    level = 'INFO'
+    label = `**[doc-size ${level}]** \`${fileName}\` is ${display} — over ${best} ${unit} best practice.`
+    tip   = '\nConsider whether all content is essential. Shorter files = lower token cost per request.'
+  }
 
   return label + tip
 }
@@ -39,5 +51,6 @@ export function execute(event, config = {}) {
   const filePath = event.tool_input?.file_path
   const content  = _readFile(filePath)
   if (!content) return null
-  return _buildMessage(filePath, _wordCount(content), config)
+  const unit = config.unit ?? DEFAULTS.unit
+  return _buildMessage(filePath, _measure(content, unit), config)
 }

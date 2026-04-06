@@ -2,6 +2,31 @@
 
 All notable changes to mcp-claude-hooks.
 
+## [0.2.0] — 2026-04-06
+
+### Fixed
+
+- **Zero-downtime daemon restart** — detached restart-helper subprocess orchestrates fork-new → wait-ready → stop-old. Fixes socket deletion race where `server.close()` auto-unlinks the Unix socket. Shutdown now checks pidfile ownership before cleanup.
+- **Loader subLoader in engine** — event-local `$ref` resolves through the correct sub-loader, not the root loader
+- **restart-helper logs to file** — helper writes ISO-timestamped entries to `run/helper.log` instead of stderr. Handler no longer manages stderr fd.
+
+### Added
+
+- **doc-size-checker rule** — three-level check (warn/ask/deny) with configurable `unit` parameter for file size enforcement
+- **Daemon test suite** — 11 tests covering lifecycle, restart, socket readiness, ownership guard, and managed-restart env
+- **Dataflow test suite** — end-to-end data flow verification through the engine pipeline
+- **Log test suite** — log file rotation and format validation
+
+### Changed
+
+- Template generator scans feature schemas dynamically instead of hardcoded list
+- All tests migrated to `node:test` with schema-validated assertions
+
+## [0.1.1] — 2026-04-05
+
+- Added repository, homepage, bugs, author to package.json
+- Added MIT LICENSE file
+
 ## [0.1.0] — 2026-04-05
 
 Initial public release.

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__dirname, '..', '..', '..')
 const DEFAULT_HOOKS_DIR = resolve(PROJECT_ROOT, 'src', 'project', 'config', 'hooks')
+const DEFAULT_FEATURES_DIR = resolve(PROJECT_ROOT, 'src', 'extend', 'hooks', 'features')
 
 // --- Helpers ---
 
@@ -83,8 +84,41 @@ function _actionEnum(ruleSchema) {
   return ruleSchema?.definitions?.Action?.enum || ['deny', 'allow', 'ask', 'context']
 }
 
-function _featureNames() {
-  return ['lint', 'doc-size-checker', 'agent']
+function _scanFeatures(featuresDir) {
+  const dir = featuresDir || DEFAULT_FEATURES_DIR
+  if (!existsSync(dir)) return []
+  const results = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const schemaPath = join(dir, entry.name, `${entry.name}.schema.json`)
+    if (!existsSync(schemaPath)) continue
+    try {
+      const schema = JSON.parse(readFileSync(schemaPath, 'utf-8'))
+      const config = {}
+      if (schema.properties) {
+        for (const [k, v] of Object.entries(schema.properties)) {
+          if (v.default !== undefined) config[k] = v.default
+          else if (v.enum) config[k] = `<${v.enum.join('|')}>`
+          else if (v.type === 'integer' || v.type === 'number') config[k] = 0
+          else if (v.type === 'string') config[k] = '?'
+          else config[k] = null
+        }
+      }
+      results.push({ name: entry.name, config })
+    } catch { /* skip malformed */ }
+  }
+  return results
+}
+
+function _featureNames(featuresDir) {
+  return _scanFeatures(featuresDir).map(f => f.name)
+}
+
+function _featureConfigs(featuresDir) {
+  const features = _scanFeatures(featuresDir)
+  const configs = {}
+  for (const f of features) configs[f.name] = f.config
+  return configs
 }
 
 // --- Public ---
@@ -165,7 +199,7 @@ export function generateTemplate(eventName, { hooksDir, ruleSchema, baseSchema }
 
     feature: {
       name: `<${_featureNames().join('|')}>`,
-      config: {}
+      configs: _featureConfigs()
     },
 
     ...(hasTool ? {

@@ -134,7 +134,7 @@ describe('daemon', () => {
   })
 
   describe('restart', () => {
-    it('restart returns new pid', async () => {
+    it('restart dispatches helper', async () => {
       pid1 = readPid()
       const resp = await sendToSocket({
         jsonrpc: '2.0', id: 2, method: 'tools/call',
@@ -146,18 +146,20 @@ describe('daemon', () => {
       const data = JSON.parse(text)
       assert.ok(data.restarting, 'not restarting')
       assert.ok(data.oldPid, 'no oldPid')
-      assert.ok(data.newPid, 'no newPid')
-      assert.notEqual(data.oldPid, data.newPid, 'oldPid === newPid')
+      assert.ok(data.helper, 'no helper pid')
     })
 
     it('old daemon dead after restart', async () => {
-      await sleep(2000)
-      assert.ok(!isAlive(pid1), `old pid ${pid1} still alive`)
+      // Helper: fork new → wait ready → stop old. Poll until old dies or timeout.
+      const deadline = Date.now() + 10000
+      while (isAlive(pid1) && Date.now() < deadline) await sleep(500)
+      assert.ok(!isAlive(pid1), `old pid ${pid1} still alive after 10s`)
     })
 
     it('new daemon responds on socket', async () => {
-      // pidfile may be deleted by old daemon shutdown (known race)
-      // verify new daemon is alive via socket instead
+      const newPid = readPid()
+      assert.ok(newPid, 'no pidfile after restart')
+      assert.notEqual(newPid, pid1, 'pid unchanged after restart')
       const resp = await sendToSocket({
         jsonrpc: '2.0', id: 3, method: 'tools/call',
         params: { name: 'hooks_admin', arguments: { action: 'status', format: 'json' } }

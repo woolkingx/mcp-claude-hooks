@@ -53,8 +53,8 @@ export function boot(overrides = {}) {
   const hooksTeardown = hooks.teardown
   const hooksLoader = hooks.loader
 
-  // Engine reload handler
-  bus.handle('engine:reload', async () => bus.send('rules:reload', {}))
+  // Engine reload — no-op, actual reload done by hooks_rules:reload in admin handler
+  bus.handle('engine:reload', () => {})
 
   const ctx = { configDir, schemas, loaders, output: rt.output, runtime: rt, bus, lifecycle: null, transport: null }
 

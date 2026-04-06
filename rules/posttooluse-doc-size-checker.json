@@ -1,6 +1,6 @@
 {
   "name": "posttooluse-doc-size-checker",
-  "description": "Warn when documentation files exceed word count thresholds (token cost awareness)",
+  "description": "Warn when documentation files exceed character count thresholds (Claude Code MAX_MEMORY_CHARACTER_COUNT = 40000 per file)",
   "enabled": true,
   "event": "PostToolUse",
   "priority": 60,
@@ -24,6 +24,8 @@
   "feature": {
     "name": "doc-size-checker",
     "config": {
+      "unit": "lines",
+      "best": 200,
       "warn": 300,
       "error": 500
     }

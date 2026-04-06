@@ -24,6 +24,10 @@ function resolvePaths(projectRoot, processConfig) {
   }
 }
 
+function _readPidSafe(pidPath) {
+  try { return parseInt(readFileSync(pidPath, 'utf-8').trim(), 10) || null } catch { return null }
+}
+
 function busLog(bus, level, msg, extra = {}) {
   if (bus) bus.send('log', { ts: Date.now(), level, message: msg, event: 'daemon', ...extra }).catch(() => {})
 }
@@ -37,7 +41,8 @@ export function startDaemon(core, { projectRoot, processConfig }) {
   mkdirSync(dirname(pidPath), { recursive: true })
 
   // Kill existing daemon before starting (prevent orphans)
-  if (existsSync(pidPath)) {
+  // Skip when managed by restart-helper (it controls old daemon lifecycle)
+  if (!process.env.__HOOKS_MANAGED_RESTART && existsSync(pidPath)) {
     const oldPid = parseInt(readFileSync(pidPath, 'utf-8').trim(), 10)
     if (oldPid && oldPid !== process.pid) {
       try { process.kill(oldPid, 'SIGTERM') } catch {}
@@ -141,6 +146,7 @@ export function startDaemon(core, { projectRoot, processConfig }) {
 
   server.listen(socketPath, () => {
     busLog(bus, 'info', `Daemon listening on ${socketPath} (pid ${process.pid})`)
+    if (process.send) process.send('ready')
   })
 
   server.on('error', (e) => {
@@ -150,9 +156,14 @@ export function startDaemon(core, { projectRoot, processConfig }) {
 
   function shutdown() {
     busLog(bus, 'info', 'Daemon shutting down')
-    server.close()
-    try { unlinkSync(socketPath) } catch {}
-    try { unlinkSync(pidPath) } catch {}
+    // Only cleanup files owned by this process (restart may have new daemon already)
+    const currentPid = _readPidSafe(pidPath)
+    const ownsFiles = !currentPid || currentPid === process.pid
+    if (ownsFiles) {
+      server.close()
+      try { unlinkSync(socketPath) } catch {}
+      try { unlinkSync(pidPath) } catch {}
+    }
     process.exit(0)
   }
 

@@ -2,16 +2,18 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "features/doc-size-checker/doc-size-checker.schema.json",
   "title": "DocSizeChecker Feature Config",
-  "description": "Word count thresholds for documentation file size warnings.",
+  "description": "Three-level size check for documentation files. Unit: lines or chars.",
   "type": "object",
   "properties": {
-    "warn":  { "type": "integer", "minimum": 1, "default": 300, "description": "Word count threshold for WARN level." },
-    "error": { "type": "integer", "minimum": 1, "default": 500, "description": "Word count threshold for ERROR level." }
+    "unit":  { "type": "string", "enum": ["lines", "chars"], "default": "lines", "description": "Measurement unit: line count or character count." },
+    "best":  { "type": "integer", "minimum": 1, "default": 200, "description": "INFO threshold — over this suggests trimming." },
+    "warn":  { "type": "integer", "minimum": 1, "default": 300, "description": "WARN threshold — approaching limit." },
+    "error": { "type": "integer", "minimum": 1, "default": 500, "description": "ERROR threshold — exceeds limit." }
   },
   "additionalProperties": false,
   "x-docs": {
-    "intent": "Warn when doc files (CLAUDE.md, AGENTS.md, GEMINI.md) exceed word thresholds. Every word in these files costs tokens on every request.",
+    "intent": "Warn when doc files (CLAUDE.md, AGENTS.md, GEMINI.md) exceed size thresholds. Default unit is lines (200/300/500). Switch to chars for Claude Code MAX_MEMORY_CHARACTER_COUNT alignment (30000/40000).",
     "category": "feature",
-    "notes": "warn < error required. Returns null when below warn threshold."
+    "notes": "best < warn < error required. Returns null when at or below best threshold. Per-file check, not aggregate."
   }
 }

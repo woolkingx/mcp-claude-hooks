@@ -313,32 +313,25 @@ function resume(_input) {
 }
 
 async function restart(_input, ctx) {
+  // Detect daemon mode: env var OR pidfile matches our pid
+  const pidFile = join(PROJECT_ROOT, 'run', 'hook.pid')
   const isDaemon = process.env.__HOOKS_DAEMON_CHILD === '1'
+    || (existsSync(pidFile) && readFileSync(pidFile, 'utf-8').trim() === String(process.pid))
 
   if (isDaemon) {
-    // Fork new daemon, then kill this one
+    // Spawn detached helper: fork new → wait ready → stop old → cleanup
+    // Helper logs to its own file (run/helper.log), no stderr needed
     const { fork } = await import('node:child_process')
-    const { resolve: pathResolve, join: pathJoin } = await import('node:path')
-    const fs = await import('node:fs')
-    const mainPath = pathResolve(import.meta.dirname, '..', '..', 'main.mjs')
-    const logPath = pathJoin(PROJECT_ROOT, 'run', 'daemon.err')
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' })
-    const oldPid = process.pid
-
-    const child = fork(mainPath, ['--daemon'], {
-      detached: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-      env: { ...process.env, __HOOKS_DAEMON_CHILD: '1' }
-    })
-    if (child.stdout) child.stdout.pipe(logStream)
-    if (child.stderr) child.stderr.pipe(logStream)
-    child.unref()
-
-    // Kill self after short delay to let response flush
-    setTimeout(() => process.kill(oldPid, 'SIGTERM'), 200)
-    return { restarting: true, oldPid, newPid: child.pid }
+    const helperPath = resolve(__dirname, '..', '..', 'adapters', 'restart-helper.mjs')
+    const helper = fork(helperPath, [
+      '--old-pid', String(process.pid),
+      '--project-root', PROJECT_ROOT
+    ], { detached: true, stdio: 'ignore' })
+    helper.unref()
+    return { restarting: true, oldPid: process.pid, helper: helper.pid }
   }
 
-  // Non-daemon mode: notify client before exit so cache can refresh
+  // Non-daemon mode: exit, let wrapper respawn
   if (ctx.transport) {
     process.stdout.write(JSON.stringify(ctx.transport.notifyToolsChanged()) + '\n')
   }

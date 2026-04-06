@@ -2,6 +2,7 @@
 // tests/test-engine.mjs — engine.processEvent unit tests
 
 import { describe, it, assert, mockBus, ROOT } from './helpers/context.mjs'
+import { assertSchemaDeny, assertSchemaAllow, assertSchemaContext, buildMinimalEvent } from './helpers/schema-assert.mjs'
 import { createEngine } from '../src/extend/hooks/engine/engine.mjs'
 import { Loader } from '../src/lib/schema2object.mjs'
 import { readFileSync } from 'node:fs'
@@ -57,7 +58,7 @@ function makeEngine(opts = {}) {
 describe('engine — processEvent', () => {
   it('no candidates → null', async () => {
     const engine = makeEngine()
-    const result = await engine.processEvent({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} })
+    const result = await engine.processEvent(buildMinimalEvent('PreToolUse', { tool_name: 'Read', tool_input: {} }))
     assert.equal(result, null)
   })
 
@@ -70,11 +71,11 @@ describe('engine — processEvent', () => {
         ]
       })
     })
-    const result = await engine.processEvent({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} })
+    const result = await engine.processEvent(buildMinimalEvent('PreToolUse', { tool_name: 'Read', tool_input: {} }))
     assert.equal(result, null)
   })
 
-  it('deny rule → deny response', async () => {
+  it('deny rule → schema-valid deny response', async () => {
     const engine = makeEngine({
       rules: mockRules({
         PreToolUse: [
@@ -83,11 +84,11 @@ describe('engine — processEvent', () => {
         ]
       })
     })
-    const result = await engine.processEvent({
-      hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' }
-    })
+    const result = await engine.processEvent(
+      buildMinimalEvent('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+    )
     assert.ok(result)
-    assert.equal(result.continue, false)
+    assertSchemaDeny('PreToolUse', result)
     assert.equal(result.hookSpecificOutput.permissionDecision, 'deny')
   })
 
@@ -101,9 +102,10 @@ describe('engine — processEvent', () => {
         ]
       })
     })
-    const event = { hook_event_name: 'SessionStart', session_id: 's1' }
+    const event = buildMinimalEvent('SessionStart', { session_id: 's1' })
     const r1 = await engine.processEvent(event)
     assert.ok(r1, 'first call should produce result')
+    assertSchemaContext('SessionStart', r1)
     const r2 = await engine.processEvent(event)
     assert.equal(r2, null, 'second call should be deduped (context is DEDUP_ACTION)')
   })
@@ -119,17 +121,17 @@ describe('engine — processEvent', () => {
         ]
       })
     })
-    const event = { hook_event_name: 'PreToolUse', tool_name: 'Bash', session_id: 's1', tool_input: { command: 'ls' } }
+    const event = buildMinimalEvent('PreToolUse', { tool_name: 'Bash', session_id: 's1', tool_input: { command: 'ls' } })
     const r1 = await engine.processEvent(event)
     assert.ok(r1)
-    assert.equal(r1.hookSpecificOutput.permissionDecision, 'deny')
+    assertSchemaDeny('PreToolUse', r1)
     // deny is NOT in DEDUP_ACTIONS, so second call should still fire
     const r2 = await engine.processEvent(event)
     assert.ok(r2)
-    assert.equal(r2.hookSpecificOutput.permissionDecision, 'deny')
+    assertSchemaDeny('PreToolUse', r2)
   })
 
-  it('feature fn call → featureResult passed to handler', async () => {
+  it('feature fn call → schema-valid context response', async () => {
     const engine = makeEngine({
       features: mockFeatures({ 'test-feature': 'feature-output-value' }),
       rules: mockRules({
@@ -140,11 +142,11 @@ describe('engine — processEvent', () => {
         ]
       })
     })
-    const result = await engine.processEvent({
-      hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' }
-    })
+    const result = await engine.processEvent(
+      buildMinimalEvent('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+    )
     assert.ok(result)
-    assert.equal(result.continue, true)
+    assertSchemaAllow('PreToolUse', result)
   })
 
   it('unknown event name → null', async () => {

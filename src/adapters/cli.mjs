@@ -36,23 +36,24 @@ export async function handleControl(command, argv, projectRoot) {
   }
 
   if (command === 'restart') {
-    const { daemonStop, daemonStatus } = await import('./daemon.mjs')
-    const fs = await import('node:fs')
-    const path = await import('node:path')
+    const { connectDaemon, daemonStatus } = await import('./daemon.mjs')
     const st = daemonStatus(projectRoot)
-    const oldPid = st.running ? st.pid : null
-    if (st.running) daemonStop(projectRoot)
-    const childArgs = argv.slice(1).filter(a => a !== '--daemon')
-    const logPath = path.join(projectRoot, 'run', 'daemon.err')
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' })
-    const child = fork(mainPath(), ['--daemon', ...childArgs], {
-      detached: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-      env: { ...process.env, __HOOKS_DAEMON_CHILD: '1' }
+    if (!st.running) {
+      process.stdout.write(JSON.stringify({ restarted: false, reason: 'not running' }) + '\n')
+      process.exit(1)
+    }
+    // Send restart via daemon socket → handler spawns restart-helper
+    const client = connectDaemon(projectRoot)
+    if (!client) {
+      process.stdout.write(JSON.stringify({ restarted: false, reason: 'cannot connect to daemon' }) + '\n')
+      process.exit(1)
+    }
+    const resp = await client.processEvent({
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'hooks_admin', arguments: { action: 'restart', format: 'json' } }
     })
-    if (child.stdout) child.stdout.pipe(logStream)
-    if (child.stderr) child.stderr.pipe(logStream)
-    child.unref()
-    process.stdout.write(JSON.stringify({ restarted: true, oldPid, newPid: child.pid }) + '\n')
+    const text = resp?.result?.content?.[0]?.text
+    process.stdout.write((text || JSON.stringify(resp)) + '\n')
     process.exit(0)
   }
 }
