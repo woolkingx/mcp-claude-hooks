@@ -170,7 +170,7 @@ export function startDaemon(core, { projectRoot, processConfig }) {
   process.on('SIGTERM', shutdown)
   process.on('SIGINT', shutdown)
   process.on('SIGHUP', () => {
-    bus.send('engine:reload').then(() => {
+    bus.send('hooks_admin:reload', {}).then(() => {
       busLog(bus, 'info', 'Rules reloaded via SIGHUP')
     }).catch(e => {
       busLog(bus, 'error', `SIGHUP reload failed: ${e.message}`)
@@ -262,14 +262,3 @@ export function daemonStop(projectRoot, processConfig) {
   }
 }
 
-export function reloadDaemon(projectRoot, processConfig) {
-  const status = daemonStatus(projectRoot, processConfig)
-  if (!status.running) return { reloaded: false, reason: 'not running' }
-
-  try {
-    process.kill(status.pid, 'SIGHUP')
-    return { reloaded: true, pid: status.pid }
-  } catch (e) {
-    return { reloaded: false, reason: e.message }
-  }
-}

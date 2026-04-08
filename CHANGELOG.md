@@ -2,6 +2,42 @@
 
 All notable changes to mcp-claude-hooks.
 
+## [0.3.1] — 2026-04-08
+
+### Added
+
+- **Health feature** — project health assessment with 9 probes (claude_md, architecture, git_active, tests, hooks_coverage, readme, manifest, license, env_protected). Weighted scoring with A-F grade, per-cwd JSON state with 3-snapshot history and trend tracking (improving/stable/degrading). Triggered on first UserPromptSubmit via `health-check` rule, injects warnings as context. Also available as `hooks_admin:health` MCP tool
+- **health-check rule** — default rule for health feature, UserPromptSubmit + repeat:false
+- 19 suites, 316 tests
+
+## [0.3.0] — 2026-04-08
+
+### Fixed
+
+- **B1: Reload pipeline convergence** — all reload triggers (CLI, MCP, CRUD, SIGHUP) now converge to `hooks_admin:reload`. Orchestration logic moved from mcp.mjs to `admin.reload()`. `engine:reload` handler calls `rules.reload()` instead of no-op. `rules:changed` handler registered in `rules.setBus()` triggers full reload pipeline
+- **B2: Layer dependency violation** — `hook-match.mjs` relocated to canonical L1 location (`src/lib/hook-match.mjs`). Engine re-exports via shim. L2 `rules.mjs` imports from L1
+- **B3: CLI reload bypassed command pattern** — CLI reload now uses daemon socket → `tools/call hooks_admin reload` instead of direct `SIGHUP`
+- **B4: CLI restart bypassed command pattern** — CLI restart uses daemon socket → `tools/call hooks_admin restart`
+- **B5: Daemon SIGHUP direct reload** — removed `reloadDaemon()`. SIGHUP handler uses `bus.send('hooks_admin:reload')`
+- **B6: SessionStart deny missing reason** — added `response.reason` on deny action
+- **B7: PostCompact invalid hookSpecificOutput** — removed `hookSpecificOutput` assignment (PostCompact has no dedicated HSO type in schema anyOf). Uses `systemMessage` for output
+
+### Added
+
+- **22 dedicated event handlers** — one handler per event schema (ConfigChange, CwdChanged, Elicitation, ElicitationResult, FileChanged, InstructionsLoaded, Notification, PostCompact, PostToolUseFailure, PreCompact, SessionStart, Setup, Stop, StopFailure, SubagentStart, SubagentStop, TaskCompleted, TaskCreated, TeammateIdle, WorktreeCreate, WorktreeRemove, UserPromptSubmit rewrite)
+- **Agent observer feature** — background analysis via `features/agent/` module
+- **`src/lib/hook-match.mjs`** — canonical L1 location for match functions
+- **Architecture docs** — `.claude/rules/` with api-surface, data-flow, debug-symptoms, hook-dataflow, pitfalls, conventions, schema-chain
+
+### Changed
+
+- `mcp.mjs` is now pure binding layer — no orchestration logic
+- `engine:reload` handler is functional (`rules.reload()` fn call, not no-op)
+- `admin.reload()` owns reload composition (`engine:reload` + `hooks_rules:reload` + runtime config)
+- `rules.setBus()` registers `rules:changed → hooks_admin:reload` handler
+- CLI stop/status documented as architectural exception (must work when daemon dead)
+- Tests: 18 suites, 292 tests
+
 ## [0.2.0] — 2026-04-06
 
 ### Fixed

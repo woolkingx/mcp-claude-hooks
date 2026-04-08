@@ -24,7 +24,8 @@ Claude Code in autonomous mode is powerful, but one wrong `rm -rf` or `git push 
 | **Test mode** | Set any rule to `"test"` — it matches and logs but takes no action. Validate before you enforce. |
 | **Deduplication** | Context rules fire once per session by default. No repeated token waste from the same reminder. |
 | **27 hook events** | Covers the full Claude Code lifecycle — tool use, permissions, sessions, subagents, compaction, worktrees, tasks, elicitation. |
-| **55 included rules** | Ships with a battle-tested rule set. Edit, disable, or delete any of them. Add your own. |
+| **Project health scoring** | Automatic health assessment on first prompt — scores documentation, tests, git activity, hooks coverage. Warnings injected as context. Per-directory state with trend tracking. |
+| **59 included rules** | Ships with a battle-tested rule set. Edit, disable, or delete any of them. Add your own. |
 | **Zero dependencies** | Node.js only. Bash parser is built-in. Nothing to install beyond `npm install`. |
 
 ## Quick Start
@@ -130,7 +131,7 @@ Bash commands are parsed into AST nodes — compound commands (`&&`, `|`, `;`) p
 
 ## Included Rules
 
-Ships with 55 rules covering common safety patterns:
+Ships with 59 rules covering common safety patterns:
 
 | Category | Examples | Count |
 |----------|----------|-------|
@@ -205,7 +206,7 @@ All 27 Claude Code hook events are supported:
 ## Testing
 
 ```bash
-# All tests (18 suites, 282 tests)
+# All tests (19 suites, 316 tests)
 npm test
 
 # Unit tests only

@@ -12,6 +12,9 @@ function mainPath() {
 }
 
 // --- Daemon control (no boot) ---
+// stop/status use direct fn calls (not daemon socket → tools/call) by design:
+//   stop must work when daemon is unresponsive; status must report when daemon is dead.
+//   reload/restart require live daemon → use daemon socket → tools/call pattern.
 
 export async function handleControl(command, argv, projectRoot) {
   if (command === 'stop') {
@@ -29,10 +32,24 @@ export async function handleControl(command, argv, projectRoot) {
   }
 
   if (command === 'reload') {
-    const { reloadDaemon } = await import('./daemon.mjs')
-    const result = reloadDaemon(projectRoot)
-    process.stdout.write(JSON.stringify(result) + '\n')
-    process.exit(result.reloaded ? 0 : 1)
+    const { connectDaemon, daemonStatus } = await import('./daemon.mjs')
+    const st = daemonStatus(projectRoot)
+    if (!st.running) {
+      process.stdout.write(JSON.stringify({ reloaded: false, reason: 'not running' }) + '\n')
+      process.exit(1)
+    }
+    const client = connectDaemon(projectRoot)
+    if (!client) {
+      process.stdout.write(JSON.stringify({ reloaded: false, reason: 'cannot connect to daemon' }) + '\n')
+      process.exit(1)
+    }
+    const resp = await client.processEvent({
+      jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'hooks_admin', arguments: { action: 'reload', format: 'json' } }
+    })
+    const text = resp?.result?.content?.[0]?.text
+    process.stdout.write((text || JSON.stringify(resp)) + '\n')
+    process.exit(0)
   }
 
   if (command === 'restart') {

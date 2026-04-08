@@ -1,0 +1,11 @@
+{
+  "name": "sessionend-agent-cleanup",
+  "description": "Clean up agent observer session on SessionEnd",
+  "enabled": false,
+  "event": "SessionEnd",
+  "priority": 90,
+  "action": "context",
+  "reason": "Agent observer: cleanup session state and kill worker.",
+  "feature": "agent",
+  "repeat": true
+}

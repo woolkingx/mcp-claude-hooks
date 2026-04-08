@@ -60,9 +60,13 @@ describe('object module — handler structure', () => {
 
 describe('object module — import paths', () => {
   it('hook-match.mjs imports from correct path', () => {
-    const src = readFileSync(join(ROOT, 'src/extend/hooks/engine/hook-match.mjs'), 'utf-8')
-    assert.ok(src.includes('../../../lib/schema2object.mjs'))
-    assert.ok(src.includes('../../../lib/bash-parser.mjs'))
+    // Canonical location is L1 lib/hook-match.mjs; engine re-exports from there
+    const src = readFileSync(join(ROOT, 'src/lib/hook-match.mjs'), 'utf-8')
+    assert.ok(src.includes('./schema2object.mjs'))
+    assert.ok(src.includes('./bash-parser.mjs'))
+    // Engine shim re-exports from canonical L1 location
+    const shim = readFileSync(join(ROOT, 'src/extend/hooks/engine/hook-match.mjs'), 'utf-8')
+    assert.ok(shim.includes('../../../lib/hook-match.mjs'))
   })
 
   it('engine.mjs receives rules/features as deps', () => {

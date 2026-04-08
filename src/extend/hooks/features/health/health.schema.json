@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "health.schema.json",
+  "title": "Health Feature",
+  "description": "Project health assessment — probe-based scoring with per-cwd state tracking.",
+
+  "definitions": {
+    "FeatureConfig": {
+      "type": "object",
+      "description": "Configuration passed via rule.feature.config",
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["claude_md", "architecture", "git_active", "tests", "hooks_coverage", "readme", "manifest", "license", "env_protected"]
+          },
+          "default": ["claude_md", "architecture", "git_active", "tests", "hooks_coverage", "readme", "manifest", "license", "env_protected"],
+          "description": "Which probes to run. Default: all."
+        },
+        "stale_days": {
+          "type": "integer",
+          "default": 14,
+          "minimum": 1,
+          "description": "Days since last commit before git_active fails."
+        },
+        "cache_minutes": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "description": "Minutes to cache results per cwd. 0 = no cache."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "ProbeResult": {
+      "type": "object",
+      "properties": {
+        "name":   { "type": "string" },
+        "status": { "type": "string", "enum": ["pass", "fail"] },
+        "weight": { "type": "integer", "minimum": 1 },
+        "detail": { "type": "string" }
+      },
+      "required": ["name", "status", "weight", "detail"]
+    },
+
+    "HealthResult": {
+      "type": "object",
+      "description": "Output of health feature execute().",
+      "properties": {
+        "cwd":         { "type": "string" },
+        "score":       { "type": "integer", "minimum": 0, "maximum": 100 },
+        "maxScore":    { "type": "integer" },
+        "grade":       { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+        "trend":       { "type": "string", "enum": ["improving", "stable", "degrading", "new"] },
+        "checks":      { "type": "array", "items": { "$ref": "#/definitions/ProbeResult" } },
+        "warnings":    { "type": "array", "items": { "type": "string" } },
+        "lastChecked": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cwd", "score", "maxScore", "grade", "trend", "checks", "warnings", "lastChecked"]
+    },
+
+    "HistoryEntry": {
+      "type": "object",
+      "properties": {
+        "ts":    { "type": "string", "format": "date-time" },
+        "score": { "type": "integer" },
+        "grade": { "type": "string" }
+      },
+      "required": ["ts", "score", "grade"]
+    },
+
+    "StateFile": {
+      "type": "object",
+      "description": "Per-cwd state stored in run/health/{hash}.json.",
+      "properties": {
+        "cwd":      { "type": "string" },
+        "history":  { "type": "array", "items": { "$ref": "#/definitions/HistoryEntry" }, "maxItems": 3 },
+        "lastFull": { "$ref": "#/definitions/HealthResult" },
+        "trend":    { "type": "string", "enum": ["improving", "stable", "degrading", "new"] }
+      },
+      "required": ["cwd", "history", "lastFull", "trend"]
+    }
+  },
+
+  "x-tests": {
+    "probes":  ["claude_md_pass", "claude_md_fail", "git_active_stale", "all_probes_run"],
+    "scoring": ["perfect_score_A", "zero_score_F", "weighted_calculation"],
+    "state":   ["history_rotation_max3", "trend_improving", "trend_degrading", "cache_hit"],
+    "feature": ["execute_returns_HealthResult", "context_format_string"]
+  }
+}

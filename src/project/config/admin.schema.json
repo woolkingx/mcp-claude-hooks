@@ -16,13 +16,14 @@
       "default": [
         { "event": "hooks_admin:config",    "description": "Read current runtime config (minus x-internal fields)." },
         { "event": "hooks_admin:status",    "description": "System health: uptime, rule count, daemon status, engine state." },
-        { "event": "hooks_admin:reload",    "description": "Reload rules via bus.send('engine:reload')." },
+        { "event": "hooks_admin:reload",    "description": "Reload all: bus.send('engine:reload') + bus.send('hooks_rules:reload') + runtime config. Single reload path for all triggers." },
         { "event": "hooks_admin:restart",   "description": "Restart daemon process." },
         { "event": "hooks_admin:pause",     "description": "Pause hook processing (pass-through mode)." },
         { "event": "hooks_admin:resume",    "description": "Resume hook processing." },
         { "event": "hooks_admin:schema",    "description": "Return schema for a given section or rule field." },
         { "event": "hooks_admin:logs",      "description": "Read from hook-audit.jsonl with optional filters." },
-        { "event": "hooks_admin:analytics", "description": "Aggregate rule match statistics from audit log." }
+        { "event": "hooks_admin:analytics", "description": "Aggregate rule match statistics from audit log." },
+        { "event": "hooks_admin:health",    "description": "Project health assessment: probe-based scoring with per-cwd state." }
       ]
     },
 
@@ -43,7 +44,7 @@
     }
   },
 
-  "x-note": "admin:reload calls bus.send('engine:reload') — does NOT import engine or rules module directly.",
+  "x-note": "admin.reload() internally calls bus.send('engine:reload') + bus.send('hooks_rules:reload'). Composition via bus.send, not direct import. mcp.mjs wiring is pure binding.",
 
   "x-tests": {
     "config":    ["returns_runtime_config", "excludes_x_internal_fields"],

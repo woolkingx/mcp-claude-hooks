@@ -120,6 +120,13 @@
         "limit": { "type": "integer", "minimum": 1, "maximum": 100000, "default": 10000, "description": "Max log entries to scan" }
       },
       "additionalProperties": false
+    },
+    "HealthInput": {
+      "type": "object",
+      "properties": {
+        "cwd": { "type": "string", "description": "Directory to assess. Default: process.cwd()" }
+      },
+      "additionalProperties": false
     }
   },
 
@@ -141,7 +148,7 @@
     },
     {
       "name": "hooks_admin",
-      "description": "Hook system administration. Actions: config, check, status, reload, restart, pause, resume, schema, logs, analytics",
+      "description": "Hook system administration. Actions: config, check, status, reload, restart, pause, resume, schema, logs, analytics, health",
       "actions": [
         { "name": "config",    "summary": "Show or set runtime configuration",              "inputSchema": { "$ref": "#/definitions/ConfigInput" } },
         { "name": "check",     "summary": "Validate schema defaults are complete",          "inputSchema": { "$ref": "#/definitions/CheckInput" } },
@@ -152,7 +159,8 @@
         { "name": "resume",    "summary": "Resume hook rules after pause",                  "inputSchema": { "$ref": "#/definitions/EmptyInput" } },
         { "name": "schema",    "summary": "Inspect schema definitions or validate data",    "inputSchema": { "$ref": "#/definitions/SchemaInput" } },
         { "name": "logs",      "summary": "View hook processing logs (all levels)",         "inputSchema": { "$ref": "#/definitions/LogsInput" } },
-        { "name": "analytics", "summary": "Per-rule match count, deny rate, avg latency",   "inputSchema": { "$ref": "#/definitions/AnalyticsInput" } }
+        { "name": "analytics", "summary": "Per-rule match count, deny rate, avg latency",   "inputSchema": { "$ref": "#/definitions/AnalyticsInput" } },
+        { "name": "health",    "summary": "Project health assessment: score, grade, warnings per cwd", "inputSchema": { "$ref": "#/definitions/HealthInput" } }
       ]
     }
   ]

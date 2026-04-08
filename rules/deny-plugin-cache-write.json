@@ -1,0 +1,25 @@
+{
+  "name": "deny-plugin-cache-write",
+  "description": "禁止写入 plugin cache 目录",
+  "enabled": true,
+  "event": "PreToolUse",
+  "priority": 10,
+  "tool": [
+    "Write",
+    "Edit"
+  ],
+  "action": "deny",
+  "reason": "plugin cache 是唯讀的，不可直接寫入",
+  "match": {
+    "properties": {
+      "tool_input": {
+        "properties": {
+          "file_path": {
+            "pattern": "\\.claude/plugins/cache/"
+          }
+        }
+      }
+    }
+  },
+  "repeat": true
+}

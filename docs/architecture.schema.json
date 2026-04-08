@@ -55,20 +55,20 @@
 
     "BusMessage": {
       "type": "object",
-      "description": "Semantic definition of a bus message. Bus is the runtime message fabric — all inter-module communication goes through bus. Two patterns: handle (one registered handler, request-response) and send (fire-and-forget, no reply expected).",
+      "description": "Semantic definition of a bus message. Bus is request-response only: one handler per event via bus.handle(), caller awaits result via bus.send(). No pub/sub, no fire-and-forget.",
       "required": ["event", "pattern"],
       "additionalProperties": false,
       "properties": {
         "event": { "$ref": "#/$defs/BusEventName" },
         "pattern": {
           "type": "string",
-          "enum": ["handle", "send"],
-          "description": "handle = exactly one handler registered via bus.handle(). send = publish event, zero or more listeners. engine:process uses handle. notifications use send."
+          "enum": ["handle"],
+          "description": "handle = exactly one handler registered via bus.handle(). bus.send() calls handler and returns result. No handler = throw."
         },
         "correlation": {
           "type": "string",
-          "enum": ["request-response", "fire-and-forget"],
-          "description": "request-response: caller awaits reply (bus.send returns result). fire-and-forget: caller does not await."
+          "enum": ["request-response"],
+          "description": "request-response: caller awaits reply (bus.send returns result)."
         },
         "owner": {
           "type": "string",
@@ -122,9 +122,9 @@
       "pattern": "^[a-z][a-z0-9]*:[a-z][a-z0-9_]*$",
       "description": "Bus event names follow namespace:action pattern",
       "examples": [
-        "engine:process", "engine:reload",
-        "rules:list", "rules:get", "rules:create", "rules:update", "rules:delete", "rules:toggle", "rules:validate", "rules:test",
-        "admin:config", "admin:status", "admin:reload", "admin:restart", "admin:pause", "admin:resume", "admin:schema", "admin:logs", "admin:analytics"
+        "hooks:process_event", "engine:reload", "rules:changed",
+        "hooks_rules:list", "hooks_rules:get", "hooks_rules:create", "hooks_rules:update", "hooks_rules:delete", "hooks_rules:toggle", "hooks_rules:validate", "hooks_rules:test", "hooks_rules:reload",
+        "hooks_admin:config", "hooks_admin:status", "hooks_admin:reload", "hooks_admin:restart", "hooks_admin:pause", "hooks_admin:resume", "hooks_admin:schema", "hooks_admin:logs", "hooks_admin:analytics"
       ]
     },
 
@@ -619,7 +619,7 @@
         "Daemon restart = fork new → SIGTERM old. NEVER process.exit() in daemon mode — that kills the daemon with no replacement. New daemon's startDaemon() cleans stale pidfile+socket automatically.",
         "__HOOKS_DAEMON_CHILD env var: set by fork parent, preserved for entire daemon lifetime. admin:restart uses it to detect daemon mode. main.mjs no longer deletes it after fork guard.",
         "Daemon stderr capture: fork with stdio ['ignore','pipe','pipe','ipc'], pipe stdout+stderr to run/daemon.err. Makes daemon crashes visible without console access.",
-        "Hooks encapsulation: hook.mjs is root extend. Internal children (rules, features, engine, handles) use object module + fn call — zero bus dependency. Only hooks:process-event exposed on bus. config.json mounts hook.schema.json as single leaf node.",
+        "Hooks encapsulation: hook.mjs is root extend. Internal children (rules, features, engine, handles) use object module + fn call. Bus surface: hooks:process-event (engine entry) + engine:reload (reload trigger → rules.reload()). config.json mounts hook.schema.json as single leaf node.",
         "Object module pattern: createX(config) → { methods }. Engine receives rules/features via dependency injection. Handlers receive features ref as parameter. No internal bus, no cross-import between children.",
         "Handler ObjectTree-first: new ObjectTree({}, schema.responseSchema, loader) → operate properties → return ObjectTree. Engine calls .$toDict() at exit. Handlers never construct plain objects.",
         "Observability: every object module and every non-trivial fn must emit bus.send('log', ...) at debug level. bus is infra — internal fn-call pattern does not prohibit bus log. Log prefix = module:fn (e.g. engine:match, handle:PreToolUse, match:validate, state:hasFired, merge:priority, feature:execute). hook.mjs passes bus to createEngine; engine passes log fn to handler payload; hook-match/state/merger/features receive bus or log fn at creation."
@@ -643,15 +643,15 @@
 
   "x-entry-points": {
     "description": "main.mjs is the only entry point. Routes by argv and stdin state. Every mode that needs core applies daemon-first: try unix socket proxy, cold-start only if no daemon. Module set loaded is determined by mode — see boot_strategy.modes.",
-    "decision_summary": "hook (piped stdin) → daemon-proxy|cold-start → runHook → exit; daemon-control (stop/status/reload/restart) → IPC only, no boot; daemon (--daemon flag) → full boot + socket; cli (cli subcommand) → daemon-proxy|cold-start → runCLI; mcp-stdio (default) → daemon-proxy|cold-start → startStdio",
+    "decision_summary": "hook (piped stdin) → daemon-proxy|cold-start → runHook → exit; daemon-control: stop/status → direct IPC, reload/restart → daemon socket tools/call; daemon (--daemon flag) → full boot + socket; cli (cli subcommand) → daemon-proxy|cold-start → runCLI; mcp-stdio (default) → daemon-proxy|cold-start → startStdio",
     "modes": [
       "main.mjs                         → mcp-stdio (default): daemon-proxy or cold-start",
       "main.mjs --sse                   → mcp-stdio + HTTP+SSE",
       "main.mjs --daemon                → daemon mode: fork + full boot",
       "main.mjs stop                    → daemon-control: IPC, no boot",
       "main.mjs status                  → daemon-control: IPC, no boot",
-      "main.mjs reload                  → daemon-control: IPC, no boot",
-      "main.mjs restart                 → daemon-control: stop + re-fork (CLI external)",
+      "main.mjs reload                  → daemon-control: daemon socket → tools/call hooks_admin:reload",
+      "main.mjs restart                 → daemon-control: daemon socket → tools/call hooks_admin:restart",
       "admin:restart (daemon internal)   → fork new daemon + SIGTERM self (never process.exit)",
       "main.mjs cli <category> [action] → cli mode: daemon-proxy or cold-start",
       "echo event | main.mjs            → hook mode: daemon-proxy or cold-start → exit"
@@ -669,8 +669,7 @@
       "setup(bus, config) → teardown(). Every module exports setup, returns teardown.",
       "handles/listens/emits declared in schema — these are the observable contract, not implementation details.",
       "depends[] drives boot order — toposort is automatic, no manual ordering.",
-      "bus.send() replaces all direct function calls between modules — same sync semantics, adds observability.",
-      "bus.emit() for fire-and-forget notifications — observers see message lifecycle.",
+      "bus.send() replaces all direct function calls between modules — same sync semantics, adds observability. bus is request-response only: one handler per event, no pub/sub.",
       "Core components (bus, schema2object) may be imported directly — they are infrastructure, not modules.",
       "Adapters receive core via injection — never import modules or extends directly."
     ]
@@ -695,7 +694,7 @@
       "sse":    "HTTP+SSE      → core.handle(tools/call)",
       "daemon": "Unix socket   → core.handle(tools/call)"
     },
-    "x-decision": "cli adapter owns ALL argv parsing. stop/status/reload/restart are CLI commands, not main.mjs logic. main.mjs only distinguishes: hook mode (piped stdin) vs everything else (cli adapter)."
+    "x-decision": "cli adapter owns ALL argv parsing. stop/status/reload/restart are daemon-control commands. reload/restart go through daemon socket → tools/call (same path as MCP). stop/status are direct IPC (no boot). main.mjs only distinguishes: hook mode (piped stdin) vs everything else (cli adapter)."
   },
 
   "x-core-invariants": [
@@ -710,6 +709,10 @@
     "Adapter receives core via injection — never via direct import",
     "Hook fallback: daemon down → cold start engine in-process; exit immediately after response",
     "Single log file: logs/YYYY-MM-DD.log — text format. foundation/log-file.mjs is the shared write primitive used by main.mjs (pre-bus) and server/log.mjs (post-bus). No JSONL, no separate audit file.",
-    "Runtime state in run/: hook-state.json, hook.pid, hook.sock, daemon.err. Not in logs/."
+    "Runtime state in run/: hook-state.json, hook.pid, hook.sock, daemon.err. Not in logs/.",
+    "One event, one handler: every hooks/*.json event schema MUST have a dedicated handler in handles/{EventName}.mjs. Handler reads the event's response schema — no default fallback for known events. default.mjs is only for truly unknown events. Each handler is the minimal processing unit, instantiated by its own event schema.",
+    "Handler reads event schema for full capability: response properties (decision, stopReason, suppressOutput), HSO type ($ref or anyOf), and event-specific input fields. A generic default handler loses event-specific capabilities.",
+    "One tool action, one handle: each tools.json action maps to exactly one bus.handle(). Composition = handler internally calls bus.send() to other handles. mcp.mjs wiring layer does pure bus.handle(event, fn) binding only — no orchestration logic. This ensures internal triggers (rules:changed → hooks_admin:reload) and external triggers (MCP tools/call → hooks_admin:reload) walk the same code path.",
+    "Reload single path: all reload triggers (CLI, MCP tool, CRUD rules:changed, SIGHUP) converge to hooks_admin:reload. admin.reload() internally calls bus.send('engine:reload') + bus.send('hooks_rules:reload'). engine:reload is handled by hook.mjs → rules.reload() (engine match data). hooks_rules:reload reloads handler cache."
   ]
 }

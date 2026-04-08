@@ -1,0 +1,11 @@
+{
+  "name": "stop-agent-observer",
+  "description": "Trigger agent observer on Stop event — incremental transcript analysis",
+  "enabled": false,
+  "event": "Stop",
+  "priority": 90,
+  "action": "context",
+  "reason": "Agent observer: analyze transcript changes since last stop.",
+  "feature": "agent",
+  "repeat": true
+}

@@ -14,9 +14,11 @@ import { createConnection } from 'node:net'
 const args = process.argv.slice(2)
 const oldPid = parseInt(argVal('--old-pid'), 10)
 const projectRoot = argVal('--project-root')
+const separatorIdx = args.indexOf('--')
+const daemonArgs = separatorIdx !== -1 ? args.slice(separatorIdx + 1) : ['--daemon']
 
 if (!oldPid || !projectRoot) {
-  process.stderr.write('usage: restart-helper --old-pid <pid> --project-root <path>\n')
+  process.stderr.write('usage: restart-helper --old-pid <pid> --project-root <path> [-- daemon-args...]\n')
   process.exit(1)
 }
 
@@ -36,7 +38,7 @@ async function run() {
   _log(`start old=${oldPid} root=${projectRoot}`)
   // 1. Fork new daemon
   const logStream = createWriteStream(daemonErrPath, { flags: 'a' })
-  const child = fork(mainPath, ['--daemon'], {
+  const child = fork(mainPath, daemonArgs, {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { ...process.env, __HOOKS_DAEMON_CHILD: '1', __HOOKS_MANAGED_RESTART: '1' }

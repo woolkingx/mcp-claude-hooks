@@ -32,12 +32,23 @@ export function setup(bus, config) {
   const state = createState({ projectRoot: config.projectRoot, bus }, loader)
   const engine = createEngine({ rules, features, state, config, projectRoot: config.projectRoot, bus, loader })
 
+  // Agent init: restore state if daemon mode
+  if (config.isDaemon) {
+    features.agent?.init(true)
+  }
+
   // Register engine on bus
   bus.handle('hooks:process-event', (event) => engine.processEvent(event))
 
+  // engine:reload — bus surface for reload pipeline
+  // admin.reload() calls bus.send('engine:reload') → fn call rules.reload()
+  bus.handle('engine:reload', () => { rules.reload() })
+
   // Teardown
   function _teardown() {
+    features.agent?.cleanup()
     bus.unhandle('hooks:process-event')
+    bus.unhandle('engine:reload')
   }
 
   return { teardown: _teardown, loader }

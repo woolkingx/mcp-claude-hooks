@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Observer Continuation Prompt",
+  "description": "Wake prompt template. One-line, sent on each Stop event to resume observation.",
+  "type": "object",
+  "properties": {
+    "wakeTemplate": {
+      "type": "string",
+      "const": "Transcript updated. Path: {transcriptPath}\nTotal lines: {totalLines}. Your last read position: line {lastLine}. Analyze new content since then."
+    },
+    "initTemplate": {
+      "type": "string",
+      "const": "New session started. Transcript: {transcriptPath}\nTotal lines: {totalLines}. Observe and analyze."
+    },
+    "noTranscriptTemplate": {
+      "type": "string",
+      "const": "New session started. Session ID: {sessionId}. No transcript available yet."
+    }
+  }
+}

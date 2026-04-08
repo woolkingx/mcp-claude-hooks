@@ -49,12 +49,11 @@ export function boot(overrides = {}) {
   setBashParserSchemas({ schemas, loaders })
 
   // Extend: hooks root (rules + features + engine)
-  const hooks = setupHooks(bus, { projectRoot: PROJECT_ROOT, rulesDir: 'rules', schemas, loaders })
+  const hooks = setupHooks(bus, { projectRoot: PROJECT_ROOT, rulesDir: 'rules', schemas, loaders, isDaemon })
   const hooksTeardown = hooks.teardown
   const hooksLoader = hooks.loader
 
-  // Engine reload — no-op, actual reload done by hooks_rules:reload in admin handler
-  bus.handle('engine:reload', () => {})
+  // engine:reload handled by hook.mjs (rules.reload() fn call)
 
   const ctx = { configDir, schemas, loaders, output: rt.output, runtime: rt, bus, lifecycle: null, transport: null }
 
@@ -65,17 +64,11 @@ export function boot(overrides = {}) {
     bus.handle(`hooks_rules:${action}`, (input) => fn(input, ctx))
   }
 
-  // Admin (hooks_admin:*)
+  // rules:changed handler registered inside setBus() (rules module owns its own reload trigger)
+
+  // Admin (hooks_admin:*) — pure binding, no orchestration logic
   for (const [action, fn] of Object.entries(adminHandlers)) {
-    if (action === 'reload') {
-      bus.handle(`hooks_admin:${action}`, async (input) => {
-        await bus.send('engine:reload')
-        await bus.send('hooks_rules:reload', {})
-        return fn(input, ctx)
-      })
-    } else {
-      bus.handle(`hooks_admin:${action}`, async (input) => fn(input, ctx))
-    }
+    bus.handle(`hooks_admin:${action}`, async (input) => fn(input, ctx))
   }
 
   // JSON-RPC dispatch (management interface)

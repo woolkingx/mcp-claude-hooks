@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features/agent/agent.schema.json",
+  "title": "Agent Observer Feature",
+  "description": "Session observer agent. Fork subprocess per session, SDK query() in worker, IPC buff back. Self-contained process manager — daemon unaware of workers.",
+
+  "definitions": {
+
+    "ModelId": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus"],
+      "default": "haiku",
+      "description": "Claude model shorthand for observer agent"
+    },
+
+    "PermissionMode": {
+      "type": "string",
+      "enum": ["default", "acceptEdits", "bypassPermissions", "plan", "dontAsk", "auto"],
+      "default": "bypassPermissions",
+      "description": "SDK permissionMode — controls tool execution permission handling"
+    },
+
+    "ToolList": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of SDK tool names"
+    },
+
+    "SDKConfig": {
+      "type": "object",
+      "description": "SDK query() options passed to agent-worker subprocess",
+      "properties": {
+        "model":            { "$ref": "#/definitions/ModelId" },
+        "maxTurnBudgetUsd": { "type": "number", "default": 0.25, "description": "Max cost per SDK query turn. Default covers haiku 200K context." },
+        "maxTurns":         { "type": "integer", "default": 3, "description": "Max agentic turns per dispatch" },
+        "permissionMode":   { "$ref": "#/definitions/PermissionMode" },
+        "allowDangerouslySkipPermissions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Required when permissionMode is bypassPermissions. Safety flag."
+        },
+        "allowedTools":     { "$ref": "#/definitions/ToolList", "default": ["Read", "Grep", "Glob"], "description": "SDK allowedTools — tools available to agent worker" },
+        "disallowedTools":  { "$ref": "#/definitions/ToolList", "default": ["Bash", "Edit", "Write", "NotebookEdit"], "description": "SDK disallowedTools — explicitly denied tools" }
+      },
+      "additionalProperties": false,
+      "default": {
+        "model": "haiku", "maxTurnBudgetUsd": 0.25, "maxTurns": 3,
+        "permissionMode": "bypassPermissions", "allowDangerouslySkipPermissions": true,
+        "allowedTools": ["Read", "Grep", "Glob"],
+        "disallowedTools": ["Bash", "Edit", "Write", "NotebookEdit"]
+      }
+    },
+
+    "WorkerConfig": {
+      "type": "object",
+      "description": "Subprocess worker management settings",
+      "properties": {
+        "timeoutMs": {
+          "type": "integer",
+          "default": 60000,
+          "description": "Kill worker if no IPC message within this time (ms)"
+        },
+        "systemPromptFile": {
+          "type": "string",
+          "default": "agent.md",
+          "description": "Path to system prompt file (relative to agent feature dir)"
+        },
+        "buffPrefix": {
+          "type": "string",
+          "default": "<!-- agent-observer -->\n",
+          "description": "Prefix prepended to buff output for recursion guard identification"
+        }
+      },
+      "additionalProperties": false,
+      "default": { "timeoutMs": 60000, "systemPromptFile": "agent.md", "buffPrefix": "<!-- agent-observer -->\n" }
+    },
+
+    "SessionEntry": {
+      "type": "object",
+      "description": "Per-session state persisted to agent-state.json",
+      "required": ["lastLine", "transcriptPath", "spawnedAt"],
+      "properties": {
+        "sdkSessionId": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "SDK session ID for resume. Null until first 'done' IPC."
+        },
+        "pid": {
+          "type": ["integer", "null"],
+          "default": null,
+          "description": "Worker process pid. Null if worker exited."
+        },
+        "lastLine": {
+          "type": "integer",
+          "default": 0,
+          "description": "Last read line in transcript JSONL"
+        },
+        "transcriptPath": {
+          "type": "string",
+          "description": "Absolute path to session transcript"
+        },
+        "spawnedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO8601 timestamp of first spawn"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "IPCBuff": {
+      "type": "object",
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "type": "string", "const": "buff" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "IPCDone": {
+      "type": "object",
+      "required": ["type", "sdkSessionId"],
+      "properties": {
+        "type": { "type": "string", "const": "done" },
+        "sdkSessionId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "IPCError": {
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": {
+        "type": { "type": "string", "const": "error" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "IPCMessage": {
+      "oneOf": [
+        { "$ref": "#/definitions/IPCBuff" },
+        { "$ref": "#/definitions/IPCDone" },
+        { "$ref": "#/definitions/IPCError" }
+      ],
+      "description": "Worker-to-daemon IPC message. Discriminated union on type field."
+    }
+  },
+
+  "type": "object",
+  "properties": {
+    "daemonOnly": {
+      "type": "boolean",
+      "default": true,
+      "description": "Only run in daemon mode. Hook cold-start = no-op"
+    },
+    "sdk":    { "$ref": "#/definitions/SDKConfig" },
+    "worker": { "$ref": "#/definitions/WorkerConfig" }
+  },
+  "additionalProperties": false,
+  "default": { "daemonOnly": true },
+
+  "x-methods": {
+    "execute": {
+      "args": ["event", "agentConfig"],
+      "returns": "null",
+      "description": "Feature interface. Sync return null. Async fire-and-forget _dispatch. Engine pipeline continues immediately."
+    },
+    "collect": {
+      "args": ["sessionId"],
+      "returns": "string|null",
+      "description": "Drain buff for session. Join with \\n\\n---\\n\\n. Clear buff after drain. Called by engine at processEvent start."
+    },
+    "cleanup": {
+      "args": ["sessionId?"],
+      "returns": "void",
+      "description": "No arg = kill all workers + clear all state. With sessionId = kill that worker + delete session/buff. Persist after."
+    },
+    "init": {
+      "args": ["isDaemon"],
+      "returns": "void",
+      "description": "Set daemon flag. Restore state from disk. Recovered sessions wait for next event (no auto-restart workers)."
+    },
+    "status": {
+      "args": [],
+      "returns": "object",
+      "description": "All session summaries. Includes child pid alive check via process.kill(pid, 0)."
+    }
+  },
+
+  "x-internal": {
+    "_dispatch": "Spawn or restart worker. _children.has(sid) -> restart (fork new, kill old). Else -> spawn.",
+    "_forkWorker": "fork('agent-worker.mjs', args, { detached, stdio: ['ignore','pipe','pipe','ipc'] }). child.on('message', _onMessage). child.on('exit', _onExit). child.unref(). _children.set(sid, child).",
+    "_killWorker": "SIGTERM -> child.on('exit') auto cleanup. Timeout 3s -> SIGKILL.",
+    "_onMessage": "IPC handler. IPCMessage discriminated union: buff -> _buff.push, done -> update session + _writeState, error -> log + cleanup.",
+    "_onExit": "_children.delete(sid). Non-zero exit -> log warn.",
+    "_readState": "Read logs/agent-state.json. Corrupt -> { sessions: {}, buff: {} }.",
+    "_writeState": "Atomic: writeFileSync(tmp) + renameSync(tmp, target)."
+  },
+
+  "x-subprocess": {
+    "model": "fork per agentId (same as restart-helper pattern)",
+    "worker": "agent-worker.mjs — parse args, build prompt, SDK query(), IPC out, exit",
+    "ipc-protocol": { "$ref": "#/definitions/IPCMessage" },
+    "lifecycle": "fork -> IPC messages -> done/error -> exit. Daemon never touches workers.",
+    "restart": "fork new -> kill old (SIGTERM). Same session, fresh worker.",
+    "isolation": "Agent manages own _children Map. daemon.mjs unaware of agent workers."
+  },
+
+  "x-state": {
+    "file": "logs/agent-state.json",
+    "sessions": {
+      "type": "object",
+      "description": "Map<hookSessionId, SessionEntry>",
+      "additionalProperties": { "$ref": "#/definitions/SessionEntry" }
+    },
+    "buff": {
+      "type": "object",
+      "description": "Map<hookSessionId, string[]> — agent outputs waiting for engine drain",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+
+  "x-integration": {
+    "features.mjs": "Register: _registry.set('agent', (event, cfg) => _agent.execute(event, cfg)). Expose: tree.agent = _agent.",
+    "engine.mjs": {
+      "drain": "processEvent start: const agentBuff = features.agent?.collect(event.session_id)",
+      "inject": "After $toDict() (line 134-137): merge agentBuff into result.additionalContext"
+    },
+    "hook.mjs": {
+      "init": "After createEngine: if (config.isDaemon) features.agent?.init(true)",
+      "teardown": "features.agent?.cleanup() — agent kills own workers"
+    },
+    "mcp.mjs": "Pass isDaemon into setupHooks config"
+  },
+
+  "x-trigger": {
+    "event": "Stop",
+    "future": ["UserPromptSubmit"],
+    "description": "Stop event triggers dispatch. One event cycle delay: output appears in next response."
+  },
+
+  "x-docs": {
+    "intent": "Observer consciousness layer. Watches session transcripts, produces [ALERT]/[FEEDBACK]/[NOTE]/[STATS] analysis, injected as additionalContext.",
+    "category": "engine.hooks.features.agent",
+    "prompt": "agent.md — W1-W6 workpoints, Init/Wake/Short workflows. Not in schema.",
+    "recursion-guard": "Prompt-level: agent.md instructs 'don't analyze other observers'. Buff inject prefixed with buffPrefix."
+  }
+}

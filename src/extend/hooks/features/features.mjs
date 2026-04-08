@@ -4,10 +4,16 @@
 
 import * as lint from './lint/lint.mjs'
 import * as docSizeChecker from './doc-size-checker/doc-size-checker.mjs'
+import * as health from './health/health.mjs'
+import { createAgent } from './agent/agent.mjs'
 import { ObjectTree } from '../../../lib/schema2object.mjs'
 
 export function createFeatures(config = {}, bus, loader) {
-  const _registry = new Map([lint, docSizeChecker].map(f => [f.name, f.execute]))
+  const _registry = new Map([lint, docSizeChecker, health].map(f => [f.name, f.execute]))
+
+  // Agent observer — self-contained process manager
+  const _agent = createAgent(config.agent || {}, bus, loader)
+  _registry.set('agent', (event, agentConfig) => _agent.execute(event, agentConfig))
 
   function _log(level, msg) {
     if (!bus) return
@@ -44,6 +50,9 @@ export function createFeatures(config = {}, bus, loader) {
   tree.list = function() {
     return [..._registry.keys()]
   }
+
+  // Expose agent for direct access (engine drain/inject, hook init/teardown)
+  tree.agent = _agent
 
   return tree
 }

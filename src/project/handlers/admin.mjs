@@ -123,7 +123,11 @@ async function status(_input, ctx) {
 }
 
 async function reload(_input, ctx) {
-  // engine:reload is triggered via bus by the module wrapper (modules/admin.mjs) before this fn runs.
+  // Composition: reload engine match data + handler cache via bus.send
+  // Same path whether triggered by MCP tool, CLI, rules:changed, or SIGHUP
+  await ctx.bus.send('engine:reload')
+  await ctx.bus.send('hooks_rules:reload', {})
+
   // Reload runtime overrides from file if exists
   let configReloaded = false
   const overridesFile = resolve(PROJECT_ROOT, 'config', 'runtime.json')
@@ -319,13 +323,16 @@ async function restart(_input, ctx) {
     || (existsSync(pidFile) && readFileSync(pidFile, 'utf-8').trim() === String(process.pid))
 
   if (isDaemon) {
-    // Spawn detached helper: fork new → wait ready → stop old → cleanup
-    // Helper logs to its own file (run/helper.log), no stderr needed
+    // Rebuild daemon args from runtime state (source of truth, not argv)
+    const daemonArgs = ['--daemon']
+    if (process.argv.includes('--sse')) daemonArgs.push('--sse')
+
     const { fork } = await import('node:child_process')
     const helperPath = resolve(__dirname, '..', '..', 'adapters', 'restart-helper.mjs')
     const helper = fork(helperPath, [
       '--old-pid', String(process.pid),
-      '--project-root', PROJECT_ROOT
+      '--project-root', PROJECT_ROOT,
+      '--', ...daemonArgs
     ], { detached: true, stdio: 'ignore' })
     helper.unref()
     return { restarting: true, oldPid: process.pid, helper: helper.pid }
@@ -339,4 +346,10 @@ async function restart(_input, ctx) {
   return { restarting: true, message: 'MCP server exiting — reconnect to reload config' }
 }
 
-export const handlers = { config, check, status, reload, restart, pause, resume, schema, logs, analytics }
+async function health({ cwd }, _ctx) {
+  const targetCwd = cwd || process.cwd()
+  const { assess } = await import('../../extend/hooks/features/health/health.mjs')
+  return assess(targetCwd)
+}
+
+export const handlers = { config, check, status, reload, restart, pause, resume, schema, logs, analytics, health }

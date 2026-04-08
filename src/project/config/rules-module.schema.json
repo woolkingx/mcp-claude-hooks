@@ -30,7 +30,7 @@
     "emits": {
       "type": "array",
       "default": [
-        { "event": "rules:changed", "description": "Emitted after any create/update/delete/toggle. engine listens to trigger reload." }
+        { "event": "rules:changed", "description": "Emitted after any create/update/delete/toggle. Handler triggers hooks_admin:reload to update engine match data + handler cache." }
       ]
     }
   },

@@ -54,8 +54,13 @@
     }
   ],
 
+  "x-bus-surface": [
+    { "event": "hooks:process_event", "pattern": "handle", "description": "Engine entry point. hook adapter sends event here." },
+    { "event": "engine:reload", "pattern": "handle", "description": "Reload engine match data. hook.mjs handles → rules.reload() fn call." }
+  ],
+
   "x-docs": {
-    "intent": "Root hooks module encapsulation. Single config.json leaf node. Declares child modules (rules/features/engine). Internal module communication via fn call, not bus.",
+    "intent": "Root hooks module encapsulation. Single config.json leaf node. Declares child modules (rules/features/engine). Internal module communication via fn call, not bus. Bus surface: hooks:process_event + engine:reload.",
     "category": "config"
   }
 }

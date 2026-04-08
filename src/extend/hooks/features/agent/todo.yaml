@@ -1,0 +1,60 @@
+sketch: agent-hook
+trigger: Stop event from Claude Code hook lifecycle
+input: { session_id, cwd, hook_event_name: "Stop" }
+
+steps:
+  # --- spawn / resume ---
+  - do: feature.dispatch(event) → null
+  - if: sessions.has(session_id)
+      - do: resume(sdkSessionId, wakePrompt) → agentResponse
+  - if: !sessions.has(session_id)
+      - do: spawn(systemPrompt, model) → subprocess
+      - do: captureSessionId(subprocess) → sdkSessionId
+      - do: sessions.set(session_id, { sdkSessionId, lastLine: 0 })
+      - do: query(wakePrompt) → agentResponse
+
+  # --- wake prompt ---
+  - do: transcriptPath(cwd, session_id) → jsonlPath
+  - do: countLines(jsonlPath) → totalLines
+  - do: buildWakePrompt(lastLine, totalLines) → wakePrompt
+  # wakePrompt = "transcript 更新，讀 line {lastLine} 到 {totalLines}，輸出回應及建議"
+
+  # --- agent 內部（提示詞驅動，非 code） ---
+  - do: agent.readTranscript(jsonlPath, lastLine, totalLines) → newContent
+  - do: agent.analyze(newContent, L1-L7) → outputs
+  # outputs 分流：
+  - if: outputs.feedback → buff[session_id].push(feedback)
+  - if: outputs.notes → agent.call(arango_insert, notes)
+  - if: outputs.alert → buff[session_id].push(alert)
+
+  # --- 回饋路徑 ---
+  - do: sessions.update(session_id, { lastLine: totalLines })
+
+  # --- buff merge（下一個 event 進 engine 時） ---
+  - do: engine.processEvent.preCheck(session_id) → pendingBuff
+  - if: pendingBuff.length > 0
+      - do: merge(pendingBuff) → response.additions
+      - do: clearBuff(session_id)
+
+  # --- teardown（SessionEnd） ---
+  - if: hook_event_name == "SessionEnd"
+      - do: collect(session_id) → finalOutput
+      - do: cleanup(session_id) → void
+
+output: { buff: string[], sessions: Map, additions: string|null }
+
+notes:
+  - model: haiku（預設），daemon only
+  - systemPrompt 一次性定義 L1-L7，叫醒只需一句話
+  - buff → additions → 清空，非同步不阻塞 engine
+  - agent 有 Read + arango MCP tools
+  - resume 是保底，正常情況 subprocess 長跑
+  - 觸發：Stop only（後續可擴展 UserPromptSubmit）
+
+open:
+  - "TODO: systemPrompt 內容 — L1-L7 行為定義 + 輸出格式"
+  - "TODO: agent output 結構化格式 — feedback vs notes vs alert 怎麼區分"
+  - "TODO: additions merge 機制 — engine 需要加 preCheck hook point"
+  - "TODO: daemon 模式外的 no-op 處理"
+  - "TODO: agent-state.json 持久化格式"
+  - "TODO: error handling — subprocess crash / transcript 不存在"

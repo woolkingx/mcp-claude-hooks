@@ -59,6 +59,8 @@ export function createEngine({ rules, features, state, config = {}, projectRoot,
     const eventName = event.hook_event_name
     if (!eventName) return null
 
+    // Agent buff drain moved to UserPromptSubmit handler (reads state file directly)
+
     const tool = event.tool_name || ''
     const tag = `${eventName}${tool ? ':' + tool : ''}`
 
@@ -132,7 +134,8 @@ export function createEngine({ rules, features, state, config = {}, projectRoot,
     }
 
     // Return output as dict (handlers return ObjectTree)
-    const result = output instanceof ObjectTree ? output.$toDict() : output
+    let result = output instanceof ObjectTree ? output.$toDict() : output
+
     log('debug', `${tag} result=${result ? JSON.stringify(result).slice(0, 200) : 'null'}`)
     return result
   }

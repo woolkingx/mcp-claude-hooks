@@ -1,0 +1,18 @@
+{
+  "name": "health-check",
+  "description": "Project health assessment — scores project completeness (docs, tests, git activity, hooks coverage) and injects warnings as context.",
+  "enabled": true,
+  "event": "UserPromptSubmit",
+  "priority": 90,
+  "action": "context",
+  "reason": "Project health assessment",
+  "feature": {
+    "name": "health",
+    "config": {
+      "checks": ["claude_md", "architecture", "git_active", "tests", "hooks_coverage", "readme", "manifest", "license", "env_protected"],
+      "stale_days": 14,
+      "cache_minutes": 30
+    }
+  },
+  "repeat": false
+}

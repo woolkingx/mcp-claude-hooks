@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Loader, ObjectTree } from '../../lib/schema2object.mjs'
-import { matchesSchema } from '../../extend/hooks/engine/hook-match.mjs'
+import { matchesSchema } from '../../lib/hook-match.mjs'
 import { generateTemplate } from './template.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -18,7 +18,11 @@ let ruleLoader = null
 let rulesCache = null  // Map<name, rule>
 let _bus = null
 
-export function setBus(bus) { _bus = bus }
+export function setBus(bus) {
+  _bus = bus
+  // rules:changed → trigger reload pipeline (same path as MCP tools/call hooks_admin:reload)
+  bus.handle('rules:changed', () => bus.send('hooks_admin:reload', {}))
+}
 
 export function setSchemaContext(ctx) {
   if (ctx?.schemas?.rules) ruleSchema = ctx.schemas.rules
