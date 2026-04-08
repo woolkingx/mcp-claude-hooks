@@ -2,6 +2,29 @@
 
 All notable changes to mcp-claude-hooks.
 
+## [0.4.0] — 2026-04-08
+
+### Fixed
+
+- **Agent buff `[object Object]` injection** — removed duplicate `_drainAgentBuff` from UserPromptSubmit handler that joined `{ts,text,sent}` objects without `.text` extraction. Buff drain now handled entirely by inject rule → featureResult → additionalContext
+- **Agent worker defaults mismatch** — worker fallback maxTurns=1/maxBudget=0.01 aligned to schema defaults (20/0.25)
+
+### Changed
+
+- **Agent buff storage split** — buff data moved from `agent-state.json` to per-session JSONL files (`logs/agent-buff-{sessionId}.jsonl`). Each entry has `{ts, text, sent}` fields. State file now contains session metadata only
+- **Agent worker result-only buffing** — worker only buffs SDK `result` events (final output), not intermediate assistant turns. Eliminates "I'll read the transcript..." preamble noise
+- **Agent maxTurns 3→20** — agent observer now has enough turns to read transcript and produce full analysis
+- **Agent two-phase rule architecture** — Stop event triggers worker dispatch (`stop-agent-observer.json`, mode=trigger), UserPromptSubmit drains buff into context (`userprompt-agent-drain.json`, mode=inject). Engine has no direct agent calls
+- **Agent observer prompt** — enforced bullet list output format (`- [TAG] finding`), prohibited prose paragraphs, recap, and repetition across dispatches
+- **Agent worker recursion guard** — `__HOOKS_AGENT_WORKER=1` env bypasses daemon proxy; `daemonOnly` guard prevents dispatch loop
+
+### Added
+
+- **`userprompt-agent-drain.json` rule** — inject mode rule for UserPromptSubmit, priority 80
+- **Features convenience methods** — `collectAgent`, `cleanupAgent`, `agentStatus`, `setAgentDaemonMode` on features tree
+- **Buff migration** — daemon init converts old `state.buff` object to per-session JSONL files (one-time migration)
+- **Sent flag crash recovery** — daemon restart resets all buff `sent` flags to false (prevents lost inject after crash)
+
 ## [0.3.1] — 2026-04-08
 
 ### Added

@@ -1,0 +1,11 @@
+{
+  "name": "userprompt-agent-drain",
+  "description": "Inject agent observer buff into user prompt context",
+  "enabled": true,
+  "event": "UserPromptSubmit",
+  "priority": 80,
+  "action": "context",
+  "reason": "Agent observer analysis from previous turns.",
+  "feature": { "name": "agent", "config": { "mode": "inject" } },
+  "repeat": true
+}

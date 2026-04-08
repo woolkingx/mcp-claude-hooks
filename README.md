@@ -24,6 +24,7 @@ Claude Code in autonomous mode is powerful, but one wrong `rm -rf` or `git push 
 | **Test mode** | Set any rule to `"test"` — it matches and logs but takes no action. Validate before you enforce. |
 | **Deduplication** | Context rules fire once per session by default. No repeated token waste from the same reminder. |
 | **27 hook events** | Covers the full Claude Code lifecycle — tool use, permissions, sessions, subagents, compaction, worktrees, tasks, elicitation. |
+| **Agent observer** | A second Claude instance watches your session in real-time — catches bugs the main assistant misses, flags wasted effort, tracks decision quality. Findings injected as context on your next prompt. Self-correcting AI, not post-hoc review. |
 | **Project health scoring** | Automatic health assessment on first prompt — scores documentation, tests, git activity, hooks coverage. Warnings injected as context. Per-directory state with trend tracking. |
 | **59 included rules** | Ships with a battle-tested rule set. Edit, disable, or delete any of them. Add your own. |
 | **Zero dependencies** | Node.js only. Bash parser is built-in. Nothing to install beyond `npm install`. |
@@ -176,6 +177,45 @@ node src/main.mjs stop             # stop
 ```
 
 Auto-detected by the hook command. No config change needed. Restart uses a detached helper process — the new daemon is fully listening before the old one receives SIGTERM.
+
+## Agent Observer
+
+A background Claude instance that watches your session transcript and produces real-time analysis — concurrent self-correction, not post-hoc review.
+
+**How it works:**
+
+1. On every Stop event, the daemon forks a worker subprocess that reads the session transcript via Claude SDK
+2. The worker analyzes new content since last read and outputs structured findings via IPC
+3. On your next prompt (UserPromptSubmit), unsent findings are injected into Claude's context as `additionalContext`
+
+**What it catches:**
+
+| Tag | Purpose |
+|-----|---------|
+| `[ALERT]` | Security risks, critical bugs, destructive operations |
+| `[FEEDBACK]` | Strategy suggestions, wasted effort, consecutive failures |
+| `[NOTE]` | Architectural decisions, insights worth remembering |
+| `[STATS]` | Workflow patterns, tool usage bottlenecks |
+
+**Architecture:**
+
+- Two-phase rule system: `stop-agent-observer.json` (trigger) + `userprompt-agent-drain.json` (inject)
+- Per-session JSONL buff files with sent-flag tracking — crash-safe, no data loss
+- Recursion guard: agent workers bypass daemon proxy, `daemonOnly` flag prevents dispatch loops
+- Haiku model by default — cheap enough to run on every stop event
+
+**Configuration** (in `rules/stop-agent-observer.json`):
+
+```json
+{
+  "feature": {
+    "name": "agent",
+    "config": { "mode": "trigger" }
+  }
+}
+```
+
+SDK defaults in `agent.schema.json`: model=haiku, maxTurns=20, maxBudget=$0.25/dispatch, tools=Read/Grep/Glob only.
 
 ## Supported Events
 

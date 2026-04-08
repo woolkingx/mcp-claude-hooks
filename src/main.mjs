@@ -42,7 +42,9 @@ if (isDaemon && !process.env.__HOOKS_DAEMON_CHILD && process.stdin.isTTY === tru
 // --- Step 2: boot core (daemon-first → cold start) ---
 
 const { connectDaemon } = await import('./adapters/daemon.mjs')
-const daemon = (!isDaemon) ? connectDaemon(PROJECT_ROOT) : null
+// Agent worker hooks bypass daemon proxy → cold start (daemonOnly guard prevents agent loop)
+const isAgentWorker = process.env.__HOOKS_AGENT_WORKER === '1'
+const daemon = (!isDaemon && !isAgentWorker) ? connectDaemon(PROJECT_ROOT) : null
 let core
 
 if (daemon) {

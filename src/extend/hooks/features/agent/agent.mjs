@@ -6,7 +6,7 @@
 // x-methods: execute, collect, cleanup, init, status
 
 import { fork } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, statSync } from 'node:fs'
+import { readFileSync, writeFileSync, appendFileSync, existsSync, renameSync, mkdirSync, unlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { appendTextLog } from '../../../../foundation/log-file.mjs'
 import { ObjectTree } from '../../../../lib/schema2object.mjs'
@@ -15,6 +15,7 @@ const AGENT_DIR = import.meta.dirname
 const WORKER_PATH = join(AGENT_DIR, 'agent-worker.mjs')
 const LOGS_DIR = resolve(AGENT_DIR, '..', '..', '..', '..', '..', 'logs')
 const STATE_FILE = join(LOGS_DIR, 'agent-state.json')
+const BUFF_PREFIX = 'agent-buff-'  // logs/agent-buff-{sessionId}.jsonl
 
 export function createAgent(config, bus, loader) {
   // --- In-memory state ---
@@ -40,9 +41,8 @@ export function createAgent(config, bus, loader) {
     appendTextLog(LOGS_DIR, level, event, msg)
   }
 
-  // --- State persistence (atomic write) ---
+  // --- State persistence (atomic write, buff in separate JSONL files) ---
   // Recursion guard: is this sessionId an agent-spawned SDK session?
-  // Reads state file (same source as UserPromptSubmit handler pattern)
   function _isAgentSession(sessionId) {
     const state = _readState()
     for (const entry of Object.values(state.sessions || {})) {
@@ -52,15 +52,15 @@ export function createAgent(config, bus, loader) {
   }
 
   function _readState() {
-    if (!existsSync(STATE_FILE)) return { sessions: {}, buff: {} }
+    if (!existsSync(STATE_FILE)) return { sessions: {} }
     try { return JSON.parse(readFileSync(STATE_FILE, 'utf-8')) }
-    catch { return { sessions: {}, buff: {} } }
+    catch { return { sessions: {} } }
   }
 
   function _writeState() {
     try {
       mkdirSync(LOGS_DIR, { recursive: true })
-      const data = { sessions: {}, buff: {} }
+      const data = { sessions: {} }
       for (const [sid, entry] of _sessions) {
         data.sessions[sid] = {
           sdkSessionId: entry.sdkSessionId,
@@ -70,14 +70,54 @@ export function createAgent(config, bus, loader) {
           spawnedAt: entry.spawnedAt,
         }
       }
-      for (const [sid, items] of _buff) {
-        if (items.length) data.buff[sid] = items
-      }
       const tmp = STATE_FILE + '.tmp'
       writeFileSync(tmp, JSON.stringify(data, null, 2))
       renameSync(tmp, STATE_FILE)
     } catch (e) {
       _log('error', null, `state:write failed: ${e.message}`)
+    }
+  }
+
+  // --- Buff file I/O: logs/agent-buff-{sessionId}.jsonl ---
+  function _buffPath(sessionId) {
+    return join(LOGS_DIR, `${BUFF_PREFIX}${sessionId}.jsonl`)
+  }
+
+  function _readBuffFile(sessionId) {
+    const p = _buffPath(sessionId)
+    if (!existsSync(p)) return []
+    try {
+      return readFileSync(p, 'utf-8')
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line))
+    } catch (e) {
+      _log('warn', sessionId, `buff:read failed: ${e.message}`)
+      return []
+    }
+  }
+
+  function _writeBuffFile(sessionId) {
+    const items = _buff.get(sessionId)
+    if (!items || !items.length) return
+    try {
+      mkdirSync(LOGS_DIR, { recursive: true })
+      const content = items.map(e => JSON.stringify({ ts: e.ts, text: e.text, sent: e.sent })).join('\n') + '\n'
+      const p = _buffPath(sessionId)
+      const tmp = p + '.tmp'
+      writeFileSync(tmp, content)
+      renameSync(tmp, p)
+    } catch (e) {
+      _log('warn', sessionId, `buff:write failed: ${e.message}`)
+    }
+  }
+
+  function _appendBuff(sessionId, entry) {
+    try {
+      mkdirSync(LOGS_DIR, { recursive: true })
+      appendFileSync(_buffPath(sessionId), JSON.stringify({ ts: entry.ts, text: entry.text, sent: entry.sent }) + '\n')
+    } catch (e) {
+      _log('warn', sessionId, `buff:append failed: ${e.message}`)
     }
   }
 
@@ -102,7 +142,7 @@ export function createAgent(config, bus, loader) {
       '--last-line', String(opts.lastLine || 0),
       '--total-lines', String(totalLines),
       '--model', _sdk.model || 'haiku',
-      '--max-turns', String(_sdk.maxTurns || 3),
+      '--max-turns', String(_sdk.maxTurns || 20),
       '--max-budget', String(_sdk.maxTurnBudgetUsd || 0.25),
       '--prompt-file', promptFile,
       '--allowed-tools', (_sdk.allowedTools || ['Read', 'Grep', 'Glob']).join(','),
@@ -111,6 +151,7 @@ export function createAgent(config, bus, loader) {
     ]
     if (_sdk.allowDangerouslySkipPermissions !== false) args.push('--dangerous-skip')
     if (opts.sdkSessionId) args.push('--resume', opts.sdkSessionId)
+    if (opts.prompt) args.push('--prompt', opts.prompt)
 
     _log('debug', sessionId, `fork:start args=${args.join(' ')}`)
 
@@ -118,6 +159,7 @@ export function createAgent(config, bus, loader) {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       execArgv: [], // Clean slate — no inherited --input-type or debug flags
+      env: { ...process.env, __HOOKS_AGENT_WORKER: '1' },
     })
     child.unref()
 
@@ -160,9 +202,11 @@ export function createAgent(config, bus, loader) {
     const prefix = _worker.buffPrefix || '<!-- agent-observer -->\n'
 
     if (msg.type === 'buff') {
-      // trace: IPC buff received
+      // trace: IPC buff received — store in memory + append to JSONL file
       if (!_buff.has(sessionId)) _buff.set(sessionId, [])
-      _buff.get(sessionId).push(prefix + msg.text)
+      const entry = { ts: Date.now(), text: prefix + msg.text, sent: false }
+      _buff.get(sessionId).push(entry)
+      _appendBuff(sessionId, entry)
       _log('debug', sessionId, `ipc:buff len=${msg.text.length}`)
     }
 
@@ -220,6 +264,7 @@ export function createAgent(config, bus, loader) {
       const newChild = _forkWorker(sessionId, transcriptPath, {
         lastLine: session?.lastLine || 0,
         sdkSessionId: session?.sdkSessionId || null,
+        prompt: agentConfig?.prompt || null,
       })
       _killWorker(sessionId) // kills old, _children already updated by _forkWorker
       _children.set(sessionId, newChild)
@@ -230,6 +275,7 @@ export function createAgent(config, bus, loader) {
       const child = _forkWorker(sessionId, transcriptPath, {
         lastLine: session?.lastLine || 0,
         sdkSessionId: session?.sdkSessionId || null,
+        prompt: agentConfig?.prompt || null,
       })
       if (!session) {
         _sessions.set(sessionId, {
@@ -254,7 +300,8 @@ export function createAgent(config, bus, loader) {
 
   const tree = new ObjectTree(_cfg, agentSchema || { type: 'object' }, loader)
 
-  // x-methods: execute — feature interface, sync return null
+  // x-methods: execute — feature interface
+  // agentConfig.mode: "trigger" → dispatch worker, "inject" → collect unsent buff
   tree.execute = function(event, agentConfig) {
     const sessionId = event.session_id
     if (!sessionId) {
@@ -268,31 +315,38 @@ export function createAgent(config, bus, loader) {
       return null
     }
 
-    const transcriptPath = event.transcript_path || ''
-    _log('debug', sessionId, `execute:entry event=${event.hook_event_name} transcript=${transcriptPath || '(none)'}`)
+    const mode = agentConfig?.mode || 'trigger'
+    _log('debug', sessionId, `execute:entry event=${event.hook_event_name} mode=${mode}`)
 
-    // Fire-and-forget async dispatch
+    if (mode === 'inject') {
+      return tree.collect(sessionId)
+    }
+
+    // trigger: fork worker for transcript analysis
+    const transcriptPath = event.transcript_path || ''
     try {
       _dispatch(sessionId, transcriptPath, agentConfig)
     } catch (e) {
       _log('error', sessionId, `execute:dispatch failed: ${e.message}`)
     }
 
-    return null // Feature contract: sync return
+    return null
   }
 
-  // x-methods: collect — drain buff for session
+  // x-methods: collect — return unsent buff entries, mark as sent
   tree.collect = function(sessionId) {
     const items = _buff.get(sessionId)
-    if (!items || !items.length) return null
-    const result = items.join('\n\n---\n\n')
-    _buff.set(sessionId, [])
-    _writeState()
-    _log('info', sessionId, `collect:done drained=${items.length} len=${result.length}`)
+    if (!items) return null
+    const unsent = items.filter(e => !e.sent)
+    if (!unsent.length) return null
+    const result = unsent.map(e => e.text).join('\n\n---\n\n')
+    for (const e of unsent) e.sent = true
+    _writeBuffFile(sessionId)  // rewrite JSONL with sent flags updated
+    _log('info', sessionId, `collect:done sent=${unsent.length} total=${items.length} len=${result.length}`)
     return result
   }
 
-  // x-methods: cleanup — kill workers, clear state
+  // x-methods: cleanup — kill workers, clear state + buff files
   tree.cleanup = function(sessionId) {
     if (sessionId) {
       _log('debug', sessionId, 'cleanup:session')
@@ -301,10 +355,15 @@ export function createAgent(config, bus, loader) {
       _sessions.delete(sessionId)
       _buff.delete(sessionId)
       _active.delete(sessionId)
+      try { unlinkSync(_buffPath(sessionId)) } catch {}
     } else {
       _log('debug', null, `cleanup:all sessions=${_sessions.size}`)
       for (const sid of [..._children.keys()]) {
         _killWorker(sid)
+      }
+      // Delete all buff files
+      for (const sid of [..._buff.keys()]) {
+        try { unlinkSync(_buffPath(sid)) } catch {}
       }
       _children.clear()
       _sessions.clear()
@@ -314,16 +373,32 @@ export function createAgent(config, bus, loader) {
     _writeState()
   }
 
-  // x-methods: init — set daemon flag, restore state
+  // x-methods: init — set daemon flag, restore state + buff from files
   tree.init = function(isDaemon) {
     _isDaemon = isDaemon
     if (isDaemon) {
       const state = _readState()
       for (const [sid, entry] of Object.entries(state.sessions || {})) {
         _sessions.set(sid, { ...entry })
+        // Restore buff from per-session JSONL file (reset sent — crash may have lost inject)
+        const items = _readBuffFile(sid)
+        if (items.length) {
+          for (const e of items) e.sent = false
+          _buff.set(sid, items)
+        }
       }
-      for (const [sid, items] of Object.entries(state.buff || {})) {
-        _buff.set(sid, items)
+      // Migration: if old state file has buff key, convert to JSONL files
+      if (state.buff) {
+        for (const [sid, items] of Object.entries(state.buff)) {
+          if (!items || !items.length) continue
+          if (_buff.has(sid)) continue  // already loaded from JSONL
+          const migrated = items.map(e => typeof e === 'string' ? { ts: 0, text: e, sent: false } : e)
+          _buff.set(sid, migrated)
+          _writeBuffFile(sid)
+          _log('info', sid, `init:migrate buff → JSONL entries=${migrated.length}`)
+        }
+        // Rewrite state file without buff key
+        _writeState()
       }
       _log('info', null, `init:done daemon=true restored sessions=${_sessions.size} buffs=${_buff.size}`)
     } else {
@@ -346,12 +421,16 @@ export function createAgent(config, bus, loader) {
         lastLine: entry.lastLine,
         transcriptPath: entry.transcriptPath,
         spawnedAt: entry.spawnedAt,
-        buffCount: (_buff.get(sid) || []).length,
+        buffTotal: (_buff.get(sid) || []).length,
+        buffUnsent: (_buff.get(sid) || []).filter(e => !e.sent).length,
         active: _active.has(sid),
       }
     }
     return out
   }
+
+  // Alias: tests expect setDaemonMode(bool) — delegates to init()
+  tree.setDaemonMode = function(isDaemon) { tree.init(isDaemon) }
 
   _log('debug', null, `createAgent:done bus=${bus ? 'connected' : 'null'}`)
   return tree

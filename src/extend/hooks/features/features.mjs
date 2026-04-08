@@ -53,6 +53,10 @@ export function createFeatures(config = {}, bus, loader) {
 
   // Expose agent for direct access (engine drain/inject, hook init/teardown)
   tree.agent = _agent
+  tree.collectAgent = (sessionId) => _agent.collect(sessionId)
+  tree.cleanupAgent = (sessionId) => _agent.cleanup(sessionId)
+  tree.agentStatus = () => _agent.status()
+  tree.setAgentDaemonMode = (isDaemon) => _agent.init(isDaemon)
 
   return tree
 }

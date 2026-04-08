@@ -109,10 +109,11 @@ describe('agent — rule file', () => {
     const rule = JSON.parse(readFileSync(rulePath, 'utf-8'))
     assert.equal(rule.name, 'stop-agent-observer')
     assert.equal(rule.event, 'Stop')
-    assert.equal(rule.feature, 'agent')
+    assert.equal(rule.feature.name, 'agent')
+    assert.equal(rule.feature.config.mode, 'trigger')
     assert.equal(rule.action, 'context')
     assert.equal(rule.repeat, true)
-    assert.equal(rule.enabled, true)
+    assert.equal(rule.enabled, true, 'agent feature enabled — loop guard verified')
   })
 })
 

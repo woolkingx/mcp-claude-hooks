@@ -59,8 +59,6 @@ export function createEngine({ rules, features, state, config = {}, projectRoot,
     const eventName = event.hook_event_name
     if (!eventName) return null
 
-    // Agent buff drain moved to UserPromptSubmit handler (reads state file directly)
-
     const tool = event.tool_name || ''
     const tag = `${eventName}${tool ? ':' + tool : ''}`
 

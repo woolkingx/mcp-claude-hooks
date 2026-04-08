@@ -24,8 +24,8 @@ const sessionId      = argVal('--session-id')
 const transcriptPath = argVal('--transcript')
 const lastLine       = parseInt(argVal('--last-line') || '0', 10)
 const model          = argVal('--model') || 'haiku'
-const maxTurns       = parseInt(argVal('--max-turns') || '1', 10)
-const maxBudgetUsd   = parseFloat(argVal('--max-budget') || '0.01')
+const maxTurns       = parseInt(argVal('--max-turns') || '20', 10)
+const maxBudgetUsd   = parseFloat(argVal('--max-budget') || '0.25')
 const promptFile     = argVal('--prompt-file')
 const allowedTools   = (argVal('--allowed-tools') || 'Read,Grep,Glob').split(',')
 const disallowedTools = (argVal('--disallowed-tools') || 'Bash,Edit,Write,NotebookEdit').split(',')
@@ -33,6 +33,7 @@ const permissionMode = argVal('--permission-mode') || 'bypassPermissions'
 const dangerousSkip  = args.includes('--dangerous-skip')
 const totalLines     = parseInt(argVal('--total-lines') || '0', 10)
 const resumeId       = argVal('--resume')
+const customPrompt   = argVal('--prompt')
 
 if (!sessionId) {
   process.send?.({ type: 'error', message: 'missing --session-id' })
@@ -40,21 +41,29 @@ if (!sessionId) {
 }
 
 // --- Build prompt ---
-let systemPrompt = 'You are an observer agent. Analyze the session transcript and provide feedback.'
+// Init: agent.md instructions + task context as user prompt (SDK has own system prompt)
+// Wake: resume session, only send update notification
+let agentInstructions = ''
 if (promptFile && existsSync(promptFile)) {
-  systemPrompt = readFileSync(promptFile, 'utf-8')
+  agentInstructions = readFileSync(promptFile, 'utf-8')
 }
 
-// Determine wake vs init prompt — give goal, not tool instructions.
-// Agent has Read/Grep/Glob and agent.md defines the workflow.
-let userPrompt
+// Build base prompt by state
+let basePrompt
 if (resumeId) {
-  userPrompt = `Transcript updated. Path: ${transcriptPath}\nTotal lines: ${totalLines}. Your last read position: line ${lastLine}. Analyze new content since then.`
+  basePrompt = `Transcript updated. Path: ${transcriptPath}\nTotal lines: ${totalLines}. Your last read position: line ${lastLine}. Analyze new content since then.`
 } else if (!transcriptPath || !existsSync(transcriptPath)) {
-  userPrompt = `New session started. Session ID: ${sessionId}. No transcript available yet.`
+  basePrompt = `New session started. Session ID: ${sessionId}. No transcript available yet.`
 } else {
-  userPrompt = `New session started. Transcript: ${transcriptPath}\nTotal lines: ${totalLines}. Observe and analyze.`
+  basePrompt = `New session started. Transcript: ${transcriptPath}\nTotal lines: ${totalLines}. Observe and analyze.`
 }
+
+// Compose: instructions + base + custom task (if any)
+const parts = []
+if (!resumeId && agentInstructions) parts.push(agentInstructions)
+parts.push(basePrompt)
+if (customPrompt) parts.push(`\nTask: ${customPrompt}`)
+const userPrompt = parts.join('\n\n---\n\n')
 
 // --- IPC send helper (fallback to stderr if not forked) ---
 function ipcSend(msg) {
@@ -65,7 +74,6 @@ function ipcSend(msg) {
 // --- Run SDK query ---
 async function run() {
   const opts = {
-    systemPrompt,
     model,
     maxTurns,
     maxBudgetUsd,
@@ -86,22 +94,19 @@ async function run() {
         sdkSessionId = msg.session_id
       }
 
-      // Capture assistant text → buff
-      if (msg.type === 'assistant' && msg.message?.content) {
-        const text = msg.message.content
-          .filter(b => b.type === 'text')
-          .map(b => b.text)
-          .join('')
-          .trim()
+      // Result event — final output after all tool calls complete
+      if (msg.type === 'result') {
+        if (msg.session_id) sdkSessionId = msg.session_id
 
-        if (text && text !== 'OK') {
-          ipcSend({ type: 'buff', text })
+        // SDKResultSuccess has .result (string), SDKResultError has .errors (string[])
+        const text = msg.is_error
+          ? (msg.errors || []).join('; ')
+          : (msg.result || '')
+        const trimmed = text.trim()
+
+        if (trimmed && trimmed !== 'OK') {
+          ipcSend({ type: 'buff', text: trimmed })
         }
-      }
-
-      // Result event — capture session ID from result too
-      if (msg.type === 'result' && msg.session_id) {
-        sdkSessionId = msg.session_id
       }
     }
   } catch (e) {

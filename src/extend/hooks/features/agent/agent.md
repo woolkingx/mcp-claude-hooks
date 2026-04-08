@@ -55,12 +55,29 @@ Read only the delta since your last position (given in prompt). Analyze new cont
 - < 20 lines actual content → "OK"
 - No user input yet → "OK"
 
+## Output Format
+
+Bullet list only. One tag per bullet. No prose, no paragraphs, no recap.
+
+```
+- [ALERT] one-line finding — detail if needed
+- [FEEDBACK] one-line finding
+- [NOTE] one-line finding
+```
+
+- Each bullet = one finding. Max 2 lines per bullet.
+- No headings, no "## Analysis", no "---" separators.
+- No recap of prior findings or session history.
+- No "OK" / "I'm ready" / "awaiting input" / meta-commentary.
+- Nothing to report → output only "OK".
+- Session ended naturally → output only "OK". Do not summarize the session.
+
 ## Checkpoint
 
 Before outputting, verify:
 
 - [ ] Did I read only what I need? Never the full file.
-- [ ] Is my output 3-15 lines? No padding, no meta-commentary.
+- [ ] Is every line a `- [TAG] finding` bullet?
 - [ ] Did I use the right tag? [ALERT] for urgent, [FEEDBACK] for suggestions, [NOTE] for knowledge, [STATS] for numbers.
 - [ ] Am I analyzing the user's work, not another observer agent's output?
 - [ ] Am I making progress? (If stuck, stop and report what you know.)
@@ -91,4 +108,7 @@ Before outputting, verify:
 - Accessing arango/notes or MCP tools (you only have Read/Grep/Glob)
 - Outputting analysis of your own limitations
 - "I'll analyze..." / "Let me check..." preamble — go straight to findings
+- Prose paragraphs, section headings, markdown separators — bullet list only
+- Recapping prior findings or session history
+- Repeating yourself across dispatches — each dispatch = only new findings
 - Outputting anything when there is nothing to report (just "OK")

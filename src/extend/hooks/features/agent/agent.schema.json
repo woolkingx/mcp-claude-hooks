@@ -32,7 +32,7 @@
       "properties": {
         "model":            { "$ref": "#/definitions/ModelId" },
         "maxTurnBudgetUsd": { "type": "number", "default": 0.25, "description": "Max cost per SDK query turn. Default covers haiku 200K context." },
-        "maxTurns":         { "type": "integer", "default": 3, "description": "Max agentic turns per dispatch" },
+        "maxTurns":         { "type": "integer", "default": 20, "description": "Max agentic turns per dispatch" },
         "permissionMode":   { "$ref": "#/definitions/PermissionMode" },
         "allowDangerouslySkipPermissions": {
           "type": "boolean",
@@ -44,7 +44,7 @@
       },
       "additionalProperties": false,
       "default": {
-        "model": "haiku", "maxTurnBudgetUsd": 0.25, "maxTurns": 3,
+        "model": "haiku", "maxTurnBudgetUsd": 0.25, "maxTurns": 20,
         "permissionMode": "bypassPermissions", "allowDangerouslySkipPermissions": true,
         "allowedTools": ["Read", "Grep", "Glob"],
         "disallowedTools": ["Bash", "Edit", "Write", "NotebookEdit"]
@@ -170,7 +170,7 @@
     "collect": {
       "args": ["sessionId"],
       "returns": "string|null",
-      "description": "Drain buff for session. Join with \\n\\n---\\n\\n. Clear buff after drain. Called by engine at processEvent start."
+      "description": "Return unsent buff for session. Join text with \\n\\n---\\n\\n. Mark sent + rewrite JSONL. Called via inject mode rule."
     },
     "cleanup": {
       "args": ["sessionId?"],
@@ -195,8 +195,12 @@
     "_killWorker": "SIGTERM -> child.on('exit') auto cleanup. Timeout 3s -> SIGKILL.",
     "_onMessage": "IPC handler. IPCMessage discriminated union: buff -> _buff.push, done -> update session + _writeState, error -> log + cleanup.",
     "_onExit": "_children.delete(sid). Non-zero exit -> log warn.",
-    "_readState": "Read logs/agent-state.json. Corrupt -> { sessions: {}, buff: {} }.",
-    "_writeState": "Atomic: writeFileSync(tmp) + renameSync(tmp, target)."
+    "_readState": "Read logs/agent-state.json (sessions only, no buff). Corrupt -> { sessions: {} }.",
+    "_writeState": "Atomic: writeFileSync(tmp) + renameSync(tmp, target). Sessions metadata only.",
+    "_buffPath": "Returns logs/agent-buff-{sessionId}.jsonl path.",
+    "_readBuffFile": "Parse JSONL lines → BuffEntry[]. Used by init to restore.",
+    "_writeBuffFile": "Rewrite full JSONL (used after collect marks sent flags).",
+    "_appendBuff": "Append single BuffEntry line (used on IPC buff receive)."
   },
 
   "x-subprocess": {
@@ -209,39 +213,50 @@
   },
 
   "x-state": {
-    "file": "logs/agent-state.json",
-    "sessions": {
-      "type": "object",
-      "description": "Map<hookSessionId, SessionEntry>",
-      "additionalProperties": { "$ref": "#/definitions/SessionEntry" }
+    "stateFile": "logs/agent-state.json",
+    "stateContent": {
+      "description": "Session metadata only, no buff data",
+      "sessions": {
+        "type": "object",
+        "description": "Map<hookSessionId, SessionEntry>",
+        "additionalProperties": { "$ref": "#/definitions/SessionEntry" }
+      }
     },
-    "buff": {
-      "type": "object",
-      "description": "Map<hookSessionId, string[]> — agent outputs waiting for engine drain",
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string" }
+    "buffFiles": {
+      "pattern": "logs/agent-buff-{sessionId}.jsonl",
+      "description": "One JSONL file per session. Each line = BuffEntry JSON.",
+      "lineSchema": {
+        "type": "object",
+        "required": ["ts", "text", "sent"],
+        "properties": {
+          "ts": { "type": "integer", "description": "Unix timestamp ms when IPC buff received" },
+          "text": { "type": "string", "description": "Agent output text with prefix" },
+          "sent": { "type": "boolean", "description": "true after collect() returns this entry" }
+        },
+        "additionalProperties": false
       }
     }
   },
 
   "x-integration": {
-    "features.mjs": "Register: _registry.set('agent', (event, cfg) => _agent.execute(event, cfg)). Expose: tree.agent = _agent.",
-    "engine.mjs": {
-      "drain": "processEvent start: const agentBuff = features.agent?.collect(event.session_id)",
-      "inject": "After $toDict() (line 134-137): merge agentBuff into result.additionalContext"
+    "features.mjs": "Register: _registry.set('agent', fn). Expose: tree.agent, tree.collectAgent, tree.cleanupAgent, tree.agentStatus, tree.setAgentDaemonMode.",
+    "engine.mjs": "No direct agent calls. Agent trigger/inject controlled by rules via features.execute(rule.feature, event).",
+    "rules": {
+      "trigger": "stop-agent-observer.json — Stop event, feature.config.mode='trigger' → dispatch worker",
+      "inject": "userprompt-agent-drain.json — UserPromptSubmit, feature.config.mode='inject' → collect unsent buff → featureResult → handler additionalContext"
     },
+    "handler": "UserPromptSubmit.mjs — featureResult string + config.mode='inject' → hso.additionalContext (not systemMessage)",
     "hook.mjs": {
       "init": "After createEngine: if (config.isDaemon) features.agent?.init(true)",
       "teardown": "features.agent?.cleanup() — agent kills own workers"
     },
-    "mcp.mjs": "Pass isDaemon into setupHooks config"
+    "main.mjs": "Agent worker (__HOOKS_AGENT_WORKER=1) bypasses daemon proxy → cold start → daemonOnly guard blocks dispatch (recursion prevention)"
   },
 
   "x-trigger": {
-    "event": "Stop",
-    "future": ["UserPromptSubmit"],
-    "description": "Stop event triggers dispatch. One event cycle delay: output appears in next response."
+    "trigger-rule": "stop-agent-observer.json — Stop event dispatches worker",
+    "inject-rule": "userprompt-agent-drain.json — UserPromptSubmit drains buff into context",
+    "description": "Rule-based two-phase: Stop triggers analysis, UserPromptSubmit injects results. One event cycle delay."
   },
 
   "x-docs": {
